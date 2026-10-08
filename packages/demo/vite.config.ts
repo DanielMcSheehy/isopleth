@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 const src = (p: string) => fileURLToPath(new URL(`../isopleth/src/${p}`, import.meta.url));
 
 export default defineConfig({
+  base: process.env.BASE_PATH ?? "/",
   server: { port: 5173, fs: { allow: [".."] } },
   resolve: {
     alias: [
