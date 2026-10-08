@@ -14,6 +14,7 @@
 
 import type { Backend } from "./types.js";
 import { BackendError } from "./types.js";
+import * as bundled from "@isopleth/wasm";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type WasmModule = Record<string, any> & { default?: (input?: unknown) => Promise<unknown>; initSync?: (opts: unknown) => unknown };
@@ -25,17 +26,13 @@ export interface LoadWasmOptions {
   bindings?: WasmModule;
 }
 
-/** Load and initialise the WebAssembly backend. */
+/**
+ * Load and initialise the WebAssembly backend. Importing `isopleth/wasm`
+ * statically pulls in `@isopleth/wasm`, so keep the import behind a dynamic
+ * `import("isopleth/wasm")` if you want it code-split.
+ */
 export async function loadWasm(options: LoadWasmOptions = {}): Promise<Backend> {
-  let mod: WasmModule;
-  if (options.bindings) {
-    mod = options.bindings;
-  } else {
-    // The specifier is built at runtime so bundlers that cannot resolve the
-    // optional dependency still bundle the rest of the library.
-    const specifier = "@isopleth/wasm";
-    mod = (await import(/* @vite-ignore */ specifier)) as WasmModule;
-  }
+  const mod: WasmModule = options.bindings ?? (bundled as unknown as WasmModule);
   if (typeof mod.default === "function") {
     await mod.default(options.module === undefined ? undefined : { module_or_path: options.module });
   }

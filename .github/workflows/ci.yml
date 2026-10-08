@@ -41,7 +41,7 @@ jobs:
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" wasm-pkg
 
   typescript:
-    name: TypeScript (library + demo, js backend)
+    name: TypeScript (library, js backend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,10 +53,9 @@ jobs:
       - run: npm run typecheck -w isopleth
       - run: npm test -w isopleth
       - run: npm run build -w isopleth
-      - run: npm run build -w @isopleth/demo
 
   typescript-wasm:
-    name: TypeScript tests on the wasm backend
+    name: TypeScript tests on the wasm backend + demo build
     runs-on: ubuntu-latest
     needs: rust
     steps:
@@ -71,3 +70,5 @@ jobs:
           path: packages/wasm/pkg
       - run: npm ci
       - run: ISOPLETH_BACKEND=wasm npm test -w isopleth
+      - run: npm run build -w isopleth
+      - run: npm run build -w @isopleth/demo

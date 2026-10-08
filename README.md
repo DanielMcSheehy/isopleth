@@ -189,6 +189,8 @@ cargo install wasm-pack
 npm run build:wasm           # → packages/wasm/pkg
 ```
 
+CI builds the package on every push and publishes it to the [`wasm-pkg`](https://github.com/DanielMcSheehy/isopleth/tree/wasm-pkg) branch, so without a Rust toolchain you can `git archive origin/wasm-pkg | tar -x -C packages/wasm/pkg`. The test suite runs against both backends (`ISOPLETH_BACKEND=wasm npm test -w isopleth`); the 560 KB `.wasm` loads in the demo via the *load wasm backend* button.
+
 ## Repository
 
 ```
@@ -202,6 +204,7 @@ packages/demo           Vite gallery (14 examples, light/dark, wasm toggle)     
 ```sh
 npm install
 cargo test --workspace && npm test -w isopleth     # 41 Rust + 47 TS tests
+npm run build:wasm                                 # optional, needs wasm-pack (or fetch the wasm-pkg branch)
 npm run dev                                        # http://localhost:5173
 ```
 

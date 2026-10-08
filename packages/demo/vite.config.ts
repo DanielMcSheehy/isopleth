@@ -12,5 +12,5 @@ export default defineConfig({
     ],
   },
   optimizeDeps: { exclude: ["@isopleth/wasm", "isopleth"] },
-  build: { target: "es2022", rollupOptions: { external: ["@isopleth/wasm"] } },
+  build: { target: "es2022" },
 });
