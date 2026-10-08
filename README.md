@@ -2,24 +2,60 @@
 
 Composable charts on **Apache ECharts 6**, with the grammar of [Observable Plot](https://observablehq.com/plot/) and **insights built in** — anomalies, forecasts, changepoints, seasonality, trends and outliers — computed by a **Rust core** (compiled to WebAssembly, built on [augurs](https://github.com/grafana/augurs)) with a pure-TypeScript fallback that works everywhere.
 
+<p align="center">
+  <img src="docs/img/auto-insights.png" alt="auto mark with anomalies, forecast, changepoint, seasonality and trend insights" width="100%">
+</p>
+
 ```ts
 import * as ip from "isopleth";
 
-const chart = ip.plot({
-  marks: [
-    ip.areaY(data, ip.windowY(7, { x: "date", y: "value", fill: "series", gradient: true })),
-    ip.lineY(data, { x: "date", y: "value", stroke: "series" }),
-    ip.ruleY([0]),
-  ],
-  insights: { anomalies: true, forecast: { horizon: 30 }, changepoints: true },
-});
-
-await chart.render(document.querySelector("#chart"));
-chart.insights.map((i) => i.summary);
-// ["2 anomalies (web) at 2024-03-31, 2024-07-19", "forecast (web): ets, 30 steps, 95% interval", ...]
+ip.plot({
+  marks: [ip.auto(data, { x: "date", y: "value" })],
+  insights: { anomalies: true, forecast: { horizon: 30 }, changepoints: true, seasonality: true, trend: true },
+  x: { zoom: true },
+}).render(document.querySelector("#chart"));
 ```
 
+One `auto` mark, one `insights` object: the chart above is the result. The red dot is a point anomaly against the shaded expected band; the orange rule and step lines mark a changepoint and the segment means; the dashed purple line and band are a 30-step forecast with its 95% interval; the grey dashes are the trend. Every finding is also returned as data with a one-line summary (the subtitle).
+
 A chart is a list of **marks** (`lineY`, `areaY`, `barY`, `rectY`, `dot`, `cell`, `ruleX`, `text`, `differenceY`, …). Each mark is `mark(data, options)` where options are **channels** (`x`, `y`, `fill`, `stroke`, `r`, `fx`, …) bound to fields, accessors or arrays. **Transforms** (`binX`, `groupX`, `stackY`, `windowY`, `mapY`, `normalizeY`, `intervalX`, `imputeY`, `shiftX`, …) are functions over options that nest: inner first. `plot()` compiles everything into a single ECharts `option` you can render, serialize, or merge into your own ECharts setup.
+
+
+## Gallery
+
+All of these are in the demo (`npm run dev`); each is a handful of lines.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/img/stacked-area.png" alt="stacked areas with rolling mean and gradient fills"><br><sub><b>stacked areas · rolling mean · gradients</b> — <code>areaY(data, windowY(7, { x, y, fill: "series", gradient: true }))</code></sub></td>
+    <td width="50%"><img src="docs/img/histogram.png" alt="histogram with stacked fill"><br><sub><b>histogram</b> — <code>rectY(data, binX({ y: "count" }, { x: "mass", fill: "species" }))</code></sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/heatmap.png" alt="heatmap"><br><sub><b>heatmap</b> — <code>cell(data, group({ fill: "sum" }, { x: "region", y: "product", fill: "revenue" }))</code></sub></td>
+    <td><img src="docs/img/difference.png" alt="year-over-year difference chart"><br><sub><b>difference, year over year</b> — <code>differenceY(data, shiftX("+1 year", groupX({ y: "sum" }, { x: "month", y: "revenue" })))</code></sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/frequency.png" alt="bar chart with frequency outliers"><br><sub><b>frequency outliers</b> — <code>barY(data, groupX({ y: "count" }, { x: "status" }))</code> + <code>insights: { frequencyOutliers: true }</code></sub></td>
+    <td><img src="docs/img/category.png" alt="dot plot with category outliers"><br><sub><b>category outliers</b> — <code>dot(data, { x: "region", y: "units", fill: "product" })</code> + <code>insights: { categoryOutliers: true }</code>, <code>x: { jitter: 14 }</code></sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/rolling.png" alt="rolling min/max envelope"><br><sub><b>rolling min / max envelope</b> — <code>areaY(data, map({ y1: window({ k: 14, reduce: "min" }), y2: window({ k: 14, reduce: "max" }) }, …))</code></sub></td>
+    <td><img src="docs/img/missing.png" alt="gaps vs imputation"><br><sub><b>missing data</b> — <code>lineY(sparse, { x, y, interval: "day" })</code> shows gaps; <code>imputeY("linear", …)</code> fills them</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/img/scatter.png" alt="scatter with size, continuous color and trend"><br><sub><b>scatter</b> — <code>dot(data, { x, y, r: "bill", fill: "bill" })</code> + <code>insights: { trend: true }</code></sub></td>
+    <td><img src="docs/img/grouped-bars.png" alt="grouped bars on quarterly time bins"><br><sub><b>time binning, dodged bars</b> — <code>barY(data, binX({ y: "sum", interval: "quarter" }, { x: "month", y: "revenue", fill: "product", dodge: true }))</code></sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/img/fleet.png" alt="series outliers across twelve hosts"><br><sub><b>series outliers</b> — twelve hosts, <code>insights: { seriesOutliers: true }</code> finds the one that drifts, dims the rest and shades the normal band</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/img/facets.png" alt="facets with per-facet anomaly detection"><br><sub><b>facets</b> — <code>lineY(data, { x, y, stroke: "series", fx: "series" })</code>; the anomaly insight runs per facet</sub></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/img/auto-insights-dark.png" alt="dark theme"><br><sub><b>dark theme</b> — <code>theme: "dark"</code> (any ECharts theme name or object)</sub></td>
+  </tr>
+</table>
 
 ## Install
 
