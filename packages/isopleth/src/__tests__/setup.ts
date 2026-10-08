@@ -6,7 +6,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { useBackend } from "../backend/index.js";
-import { wrapWasm } from "../backend/wasm.js";
+import { wrapWasm } from "../backend/wasm-wrap.js";
 
 if (process.env.ISOPLETH_BACKEND === "wasm") {
   const dir = fileURLToPath(new URL("../../../wasm/pkg/", import.meta.url));
