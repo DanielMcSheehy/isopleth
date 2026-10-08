@@ -11,10 +11,11 @@ use augurs::changepoint::{DefaultArgpcpDetector, Detector as _, NormalGammaDetec
 pub enum ChangepointMethod {
     /// Binary segmentation on the mean with a BIC-style penalty.
     BinarySegmentation,
-    /// augurs' autoregressive Gaussian-process BOCPD (default `Auto` for n ≤ 2000).
+    /// augurs' autoregressive Gaussian-process BOCPD. Opt-in: O(n²), seconds for a few thousand points.
     Argpcp,
-    /// augurs' Normal–Gamma BOCPD.
+    /// augurs' Normal–Gamma BOCPD (opt-in).
     NormalGamma,
+    /// Binary segmentation with the configured cost model (default).
     Auto,
 }
 
@@ -92,14 +93,10 @@ pub fn detect(y: &[f64], opts: ChangepointOptions) -> Result<ChangepointResult> 
         });
     }
     let filled = impute(y, Impute::Linear);
+    // `Auto` is binary segmentation: the BOCPD detectors are O(n²) and take
+    // seconds for a few thousand points, so they are opt-in.
     let method = match opts.method {
-        ChangepointMethod::Auto => {
-            if n <= 2000 {
-                ChangepointMethod::Argpcp
-            } else {
-                ChangepointMethod::BinarySegmentation
-            }
-        }
+        ChangepointMethod::Auto => ChangepointMethod::BinarySegmentation,
         m => m,
     };
     let (mut indices, name): (Vec<usize>, &'static str) = match method {

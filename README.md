@@ -128,7 +128,7 @@ ip.plot({
   insights: {
     anomalies: { method: "seasonal", sensitivity: 0.6 },      // mad | zscore | iqr | seasonal | ewma
     forecast: { method: "auto", horizon: 24, level: 0.9 },   // ets | mstl (wasm) · holt | holt-winters | drift | naive
-    changepoints: { model: "linear" },                        // binseg (linear | mean) · argpcp | normal-gamma (wasm)
+    changepoints: { model: "linear" },                        // binseg (linear | mean) · argpcp | normal-gamma (wasm, opt-in)
     seasonality: true,                                        // periodogram (wasm) + autocorrelation
     trend: { method: "theil-sen" },                           // ols | theil-sen
     seriesOutliers: { target: "cpu" },                        // dbscan (wasm) | mad
@@ -176,7 +176,7 @@ Scale types are inferred from the data (strings/booleans → category axis, date
 | binning, grouping, windows, maps, imputation | ✓ | ✓ |
 | anomalies (mad, zscore, iqr, seasonal, ewma) | ✓ | ✓ |
 | forecast | naive, drift, Holt, Holt–Winters | + augurs **AutoETS**, **MSTL** |
-| changepoints | binary segmentation (linear/mean) | + augurs **ARGPCP**, **Normal–Gamma** BOCPD |
+| changepoints | binary segmentation (linear/mean) | + augurs **ARGPCP**, **Normal–Gamma** BOCPD (opt-in; O(n²)) |
 | seasonality | autocorrelation | + augurs **periodogram** |
 | series outliers | per-timestamp MAD | + augurs **DBSCAN** |
 | frequency / category outliers, trend | ✓ | ✓ |
