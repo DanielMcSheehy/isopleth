@@ -84,8 +84,10 @@ describe("plot → option", () => {
     const d = Array.from({ length: 30 }, (_, i) => ({ x: i, a: Math.sin(i / 3), b: Math.cos(i / 3) }));
     const chart = ip.plot({ marks: [ip.differenceY(d, { x: "x", y1: "a", y2: "b" })] });
     const s = series(chart);
-    expect(s.filter((x) => x.areaStyle).length).toBe(2);
-    expect(s.filter((x) => x.areaStyle)[0].data.length).toBeGreaterThan(30); // crossing points inserted
+    const bands = s.filter((x) => x.type === "custom");
+    expect(bands.map((b) => b.name)).toEqual(["positive", "negative"]);
+    expect(bands[0].data.length).toBeGreaterThan(30); // crossing points inserted
+    expect(s.filter((x) => x.type === "line" && !x.silent).length).toBe(1);
   });
 
   it("facets create one grid per key with shared axes", () => {

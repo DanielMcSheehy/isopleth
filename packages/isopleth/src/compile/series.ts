@@ -296,45 +296,31 @@ function compileArea(rm: ResolvedMark, I: number[], ctx: CompileContext, horizon
         data,
         ...(mode === "native" ? { stack: rm.mark.id, stackStrategy: "samesign" } : {}),
         lineStyle: { ...lineStyle, ...(color && !stroke ? { color } : {}) },
-        areaStyle: { color: areaColor, opacity: o.gradient ? 1 : fillOpacity, origin: "start" },
+        areaStyle: { color: areaColor, opacity: o.gradient ? 1 : fillOpacity, origin: "auto" },
         itemStyle: color ? { color } : {},
       };
       applySeriesStyle(s, rm, g, ctx);
       series.push(s);
     } else {
-      // Explicit band: transparent base at y1 plus a band of height y2 - y1 in a private stack.
-      const stackId = `${rm.mark.id}:${ctx.facet}:${k}:band`;
-      const base: AnySeries = {
-        ...baseSeries(rm, g, ctx, k),
-        ...common,
-        id: `${rm.mark.id}:${ctx.facet}:${k}:base`,
-        name: `${seriesName(rm, g)} (base)`,
-        data: g.index.map((i) => pair(i, toNumber(B1![i]))),
-        stack: stackId,
-        stackStrategy: "all",
-        lineStyle: { width: 0, opacity: 0 },
-        itemStyle: { opacity: 0 },
-        silent: true,
-        tooltip: { show: false },
-        emphasis: { disabled: true },
-      };
-      const band: AnySeries = {
-        ...baseSeries(rm, g, ctx, k),
-        ...common,
-        data: g.index.map((i) => {
-          const v1 = toNumber(B1![i]);
-          const v2 = toNumber(B2[i]);
-          const h = Number.isFinite(v1) && Number.isFinite(v2) ? v2 - v1 : NaN;
-          return withHighlight(pair(i, Number.isFinite(h) ? h : null), rm, i, ctx);
-        }),
-        stack: stackId,
-        stackStrategy: "all",
-        lineStyle: { ...lineStyle, ...(color && !stroke ? { color } : {}) },
-        areaStyle: { color: areaColor, opacity: o.gradient ? 1 : fillOpacity },
-        itemStyle: color ? { color } : {},
-      };
+      // Explicit band between y1 and y2: an exact polygon (no stacking, so the axis extent is untouched).
+      const pos = g.index.map((i) => coord(ps, P[i]));
+      const lo = g.index.map((i) => toNumber(B1![i]));
+      const hi = g.index.map((i) => toNumber(B2[i]));
+      const band = bandSeries(baseSeries(rm, g, ctx, k), pos, lo, hi, horizontal, { color: areaColor ?? color, opacity: o.gradient ? 1 : fillOpacity });
       applySeriesStyle(band, rm, g, ctx);
-      series.push(base, band);
+      series.push(band);
+      if (stroke) {
+        series.push({
+          ...baseSeries(rm, g, ctx, k),
+          ...common,
+          id: `${rm.mark.id}:${ctx.facet}:${k}:edge`,
+          data: g.index.map((i) => pair(i, Number.isFinite(toNumber(B2[i])) ? toNumber(B2[i]) : null)),
+          lineStyle,
+          itemStyle: { color: stroke },
+          silent: true,
+          tooltip: { show: false },
+        });
+      }
     }
     if (!rm.mark.generated && o.legend !== false && (g.value !== undefined || o.name)) legend.push(seriesName(rm, g));
   });
@@ -343,6 +329,59 @@ function compileArea(rm: ResolvedMark, I: number[], ctx: CompileContext, horizon
 
 function verticalGradient(colors: string[]): GradientSpec {
   return { type: "linear", x: 0, y: 0, x2: 0, y2: 1, colorStops: colors.map((c, i) => ({ offset: colors.length === 1 ? 0 : i / (colors.length - 1), color: c })) };
+}
+
+
+interface BandStyle {
+  color: string | GradientSpec | undefined;
+  opacity: number;
+}
+
+/**
+ * A filled band between two edges as a custom polygon series. Gaps (NaN on
+ * either edge) split the band into separate polygons. `pos` are axis
+ * coordinates along the independent axis; `lo`/`hi` the dependent values.
+ */
+export function bandSeries(base: AnySeries, pos: (string | number | null)[], lo: number[], hi: number[], horizontal: boolean, style: BandStyle): AnySeries {
+  const data = pos.map((p, j) => [p, Number.isFinite(lo[j]) ? lo[j] : null, Number.isFinite(hi[j]) ? hi[j] : null]);
+  return {
+    ...base,
+    type: "custom",
+    data,
+    encode: horizontal ? { x: [1, 2], y: 0 } : { x: 0, y: [1, 2] },
+    clip: true,
+    silent: base.silent ?? true,
+    tooltip: { show: false },
+    itemStyle: { color: style.color, opacity: style.opacity },
+    renderItem: (params: any, api: any) => {
+      if (params.dataIndex !== 0) return null;
+      const n = params.dataInsideLength ?? data.length;
+      const polygons: number[][][] = [];
+      let top: number[][] = [];
+      let bottom: number[][] = [];
+      const flush = () => {
+        if (top.length > 1) polygons.push([...top, ...bottom.reverse()]);
+        top = [];
+        bottom = [];
+      };
+      for (let i = 0; i < n; i++) {
+        const p = api.value(0, i);
+        const a = api.value(1, i);
+        const b = api.value(2, i);
+        if (p === null || p === undefined || Number.isNaN(p) || a === null || b === null || Number.isNaN(a) || Number.isNaN(b)) {
+          flush();
+          continue;
+        }
+        top.push(horizontal ? api.coord([b, p]) : api.coord([p, b]));
+        bottom.push(horizontal ? api.coord([a, p]) : api.coord([p, a]));
+      }
+      flush();
+      if (polygons.length === 0) return null;
+      const fill = api.visual("color");
+      const children = polygons.map((points) => ({ type: "polygon", shape: { points }, style: { fill, opacity: api.visual("opacity") ?? style.opacity, stroke: "none" } }));
+      return children.length === 1 ? children[0] : { type: "group", children };
+    },
+  };
 }
 
 // ------------------------------------------------------------------- bar ---
@@ -721,20 +760,12 @@ function compileDifference(rm: ResolvedMark, I: number[], ctx: CompileContext): 
       pc.push(yc[j]);
     }
     const asCoord = (v: number) => (xs.type === "temporal" || xs.type === "quantitative" ? v : coord(xs, X2[g.index[0]]));
-    const mk = (name: string, base: number[], height: number[], color: string, opacity: number, idx: string): AnySeries[] => {
-      const stackId = `${rm.mark.id}:${ctx.facet}:${k}:${idx}`;
-      const common = { type: "line", showSymbol: false, xAxisIndex: ctx.facet, yAxisIndex: ctx.facet, animation: ctx.animation, stack: stackId, stackStrategy: "all", silent: true, tooltip: { show: false }, emphasis: { disabled: true }, z: 1 };
-      return [
-        { ...common, id: `${stackId}:base`, name: `${name} base`, data: px.map((x, j) => [asCoord(x), Number.isFinite(base[j]) ? base[j] : null]), lineStyle: { width: 0, opacity: 0 }, itemStyle: { opacity: 0 } },
-        { ...common, id: `${stackId}:band`, name, data: px.map((x, j) => [asCoord(x), Number.isFinite(height[j]) ? height[j] : null]), lineStyle: { width: 0, opacity: 0 }, areaStyle: { color, opacity }, itemStyle: { color } },
-      ];
-    };
-    const posBase = pc.map((c, j) => Math.min(c, pm[j]));
-    const posH = pm.map((m, j) => Math.max(0, m - pc[j]));
-    const negBase = pm.map((m, j) => Math.min(m, pc[j]));
-    const negH = pc.map((c, j) => Math.max(0, c - pm[j]));
-    series.push(...mk("positive", pc.map((c, j) => (Number.isFinite(posBase[j]) ? posBase[j] : c)), posH, positive, o.positiveFillOpacity ?? fillOpacity, "pos"));
-    series.push(...mk("negative", negBase, negH, negative, o.negativeFillOpacity ?? fillOpacity, "neg"));
+    const posCoords = px.map((x) => asCoord(x));
+    const mk = (name: string, lo: number[], hi: number[], color: string, opacity: number, idx: string): AnySeries =>
+      bandSeries({ ...baseSeries(rm, g, ctx, k), id: `${rm.mark.id}:${ctx.facet}:${k}:${idx}`, name, z: 1 }, posCoords, lo, hi, false, { color, opacity });
+    // Positive: metric above comparison; negative: below. Crossing points were inserted so each band collapses to zero height on the other side.
+    series.push(mk("positive", pc.map((c, j) => Math.min(c, pm[j])), pm, positive, o.positiveFillOpacity ?? fillOpacity, "pos"));
+    series.push(mk("negative", pm, pc.map((c, j) => Math.max(c, pm[j])), negative, o.negativeFillOpacity ?? fillOpacity, "neg"));
     const stroke = rm.constants.stroke ?? (ctx.theme === "dark" ? "#eee" : "#222");
     series.push({
       ...baseSeries(rm, g, ctx, k),
@@ -753,7 +784,7 @@ function compileDifference(rm: ResolvedMark, I: number[], ctx: CompileContext): 
         type: "line",
         data: xm.map((x, j) => [asCoord(x), Number.isFinite(yc[j]) ? yc[j] : null]),
         showSymbol: false,
-        lineStyle: { width: 1, color: stroke, opacity: 0.35, type: "dashed" },
+        lineStyle: { width: 1, color: stroke, opacity: 0.5, type: "dashed" },
         itemStyle: { color: stroke },
         tooltip: { show: false },
         silent: true,

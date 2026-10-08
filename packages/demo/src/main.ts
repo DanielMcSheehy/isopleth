@@ -59,8 +59,8 @@ const examples: Example[] = [
   },
   {
     id: "histogram",
-    title: "binning and normalized stacks",
-    description: "binX with a count reducer; the fill channel subdivides each bin, and stackY normalizes to shares.",
+    title: "histogram (binX + stacked fill)",
+    description: "binX with a count reducer picks nice thresholds; the fill channel subdivides each bin and rectY stacks the parts.",
     code: `ip.plot({
   marks: [ip.rectY(peng, ip.binX({ y: "count" }, { x: "mass", fill: "species" }))],
   x: { label: "body mass (g)" },

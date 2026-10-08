@@ -319,7 +319,7 @@ function runTrend(rm: ResolvedMark, s: SeriesData, c: Cfg<TrendInsight>, out: In
     method: r.method,
     backend: backendName,
     data: r,
-    summary: `trend${seriesLabel(rm, s)}: ${total >= 0 ? "+" : ""}${formatValue(total)} over the period (R² ${Number.isFinite(r.r2) ? r.r2.toFixed(2) : "–"})`,
+    summary: `trend${seriesLabel(rm, s)}: ${total >= 0 ? "+" : ""}${formatValue(total)} ${s.temporal ? "over the period" : "across the x range"} (R² ${Number.isFinite(r.r2) ? r.r2.toFixed(2) : "–"})`,
   });
   if (c.show === false) return;
   const pts = [0, s.x.length - 1].map((j) => ff({ x: xValue(s.x[j], s.temporal), y: r.fitted[j] }));
