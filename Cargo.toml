@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["crates/isopleth-core", "crates/isopleth-wasm"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/DanielMcSheehy/isopleth"
+authors = ["Daniel McSheehy"]
+
+[workspace.dependencies]
+augurs = { version = "0.10.2", default-features = false }
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,10 @@
+target/
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+coverage/
+# wasm-pack output is built, not committed
+packages/isopleth/src/backend/wasm/pkg/
+packages/wasm/pkg/
+.vite/

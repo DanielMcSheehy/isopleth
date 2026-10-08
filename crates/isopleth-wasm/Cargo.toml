@@ -1,0 +1,32 @@
+[package]
+name = "isopleth-wasm"
+description = "wasm-bindgen bindings for isopleth-core, published to npm as @isopleth/wasm."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+isopleth-core = { path = "../isopleth-core" }
+wasm-bindgen = "0.2.100"
+js-sys = "0.3"
+serde = { workspace = true }
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = { version = "0.1", optional = true }
+
+# augurs uses `rand` (ETS interval simulation, MAD detector); on wasm32 both
+# getrandom generations need a JS backend. These are no-ops on native targets.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+[features]
+default = ["console_error_panic_hook"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

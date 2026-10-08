@@ -1,0 +1,15 @@
+[package]
+name = "isopleth-core"
+description = "Numeric kernels for the isopleth chart grammar: binning, windows, stacking and time-series insights (anomalies, forecasts, changepoints, seasonality, outliers)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+augurs = { workspace = true, features = ["outlier", "ets", "mstl", "forecaster", "changepoint", "seasons"] }
+serde = { workspace = true }
+
+[dev-dependencies]
+rand = "0.8"
