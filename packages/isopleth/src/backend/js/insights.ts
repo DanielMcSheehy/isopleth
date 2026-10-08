@@ -133,9 +133,10 @@ export function seasonality(y: Float64Array, opts: SeasonalityOpts = {}): Season
 
 // -------------------------------------------------------------- anomaly ---
 
+/** Default rolling window: ~n/10 (or 2 periods), at least 7, at most 201, odd. */
 export function defaultWindow(n: number, period?: number): number {
   const base = period !== undefined && period >= 4 ? Math.max(7, 2 * period) : Math.max(7, Math.floor(n / 10));
-  const w = Math.min(base, Math.max(1, n));
+  const w = Math.min(base, 201, Math.max(1, n));
   return w % 2 === 0 ? w + 1 : w;
 }
 
@@ -146,17 +147,20 @@ export function rollingMedianMad(y: ArrayLike<number>, k: number): [Float64Array
   const global = Math.max(Number.EPSILON, S.mad(y) * S.MAD_TO_SIGMA);
   const centre = new Float64Array(n);
   const scale = new Float64Array(n);
+  // Typed-array sorts (no comparator) are several times faster than Array#sort here.
+  const buf = new Float64Array(k);
+  const dev = new Float64Array(k);
   for (let i = 0; i < n; i++) {
     let lo = Math.max(0, i - half);
     const hi = Math.min(n, lo + k);
     lo = Math.min(lo, Math.max(0, hi - k));
-    const buf: number[] = [];
-    for (let j = lo; j < hi; j++) if (Number.isFinite(y[j])) buf.push(y[j]);
-    buf.sort((a, b) => a - b);
-    const m = S.quantileSorted(buf, 0.5);
-    const dev = buf.map((v) => Math.abs(v - m)).sort((a, b) => a - b);
-    const s = S.quantileSorted(dev, 0.5) * S.MAD_TO_SIGMA;
-    centre[i] = m;
+    let m = 0;
+    for (let j = lo; j < hi; j++) if (Number.isFinite(y[j])) buf[m++] = y[j];
+    const win = buf.subarray(0, m).sort();
+    const med = S.quantileSorted(win, 0.5);
+    for (let j = 0; j < m; j++) dev[j] = Math.abs(win[j] - med);
+    const s = S.quantileSorted(dev.subarray(0, m).sort(), 0.5) * S.MAD_TO_SIGMA;
+    centre[i] = med;
     scale[i] = s > 0 && Number.isFinite(s) ? s : global;
   }
   return [centre, scale];

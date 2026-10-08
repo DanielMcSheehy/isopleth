@@ -119,14 +119,15 @@ fn finish(
     }
 }
 
-/// Default rolling window: roughly a tenth of the series, at least 7, odd.
+/// Default rolling window: roughly a tenth of the series (or two periods), at
+/// least 7, at most 201, odd.
 pub fn default_window(n: usize, period: Option<usize>) -> usize {
     let base = match period {
         Some(p) if p >= 4 => (2 * p).max(7),
         _ => (n / 10).max(7),
     };
-    let w = base.min(n.max(1));
-    if w % 2 == 0 {
+    let w = base.min(201).min(n.max(1));
+    if w.is_multiple_of(2) {
         w + 1
     } else {
         w
