@@ -75,6 +75,22 @@ export function parseColor(c: string): [number, number, number, number] | null {
   return null;
 }
 
+/** Relative luminance (0..1) of a hex/rgb colour; 0.5 when unparseable. */
+export function luminance(color: string): number {
+  const p = parseColor(color);
+  if (!p) return 0.5;
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
+}
+
+/** Black or white ink for text placed on `fill`. */
+export function inkOn(fill: string): string {
+  return luminance(fill) > 0.42 ? "#111318" : "#ffffff";
+}
+
 /** `color` with its alpha multiplied by `opacity` (falls back to the color itself if unparseable). */
 export function withOpacity(color: string, opacity: number): string {
   const p = parseColor(color);

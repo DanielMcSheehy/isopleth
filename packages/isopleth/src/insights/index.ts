@@ -28,7 +28,7 @@ import { getBackend } from "../backend/index.js";
 import { formatValue, inferType, keyof, toNumber } from "../channel.js";
 import { guessTimeInterval, medianStep } from "../interval.js";
 import { createMark } from "../marks.js";
-import { INSIGHT_COLORS } from "../compile/palette.js";
+import type { Theme } from "../theme.js";
 import type { ResolvedMark } from "../compile/resolve.js";
 import type { FacetPlan } from "../compile/resolve.js";
 import { groupSeries, type ItemHighlight, type SeriesStyle } from "../compile/series.js";
@@ -105,7 +105,10 @@ function seriesData(rm: ResolvedMark, I: readonly number[]): SeriesData[] {
 
 const xValue = (v: number, temporal: boolean): Value => (temporal ? new Date(v) : v);
 
-export function applyInsights(resolved: ResolvedMark[], plan: FacetPlan, options: PlotOptions): InsightOutput {
+let IC: Theme["insight"];
+
+export function applyInsights(resolved: ResolvedMark[], plan: FacetPlan, options: PlotOptions, theme: Theme): InsightOutput {
+  IC = theme.insight;
   const out: InsightOutput = { marks: [], insights: [], highlights: new Map(), seriesStyles: new Map(), notes: [], warnings: [] };
   const backend = getBackend();
   for (const rm of resolved) {
@@ -176,7 +179,7 @@ function highlight(out: InsightOutput, markId: string, i: number, h: ItemHighlig
 function runAnomalies(rm: ResolvedMark, s: SeriesData, c: Cfg<AnomalyInsight>, out: InsightOutput, ff: (r: Row) => Row, fo: Row, backendName: "js" | "wasm") {
   if (s.y.filter(Number.isFinite).length < 8) return;
   const r: AnomalyResult = getBackend().anomalies(s.y, { method: c.method, sensitivity: c.sensitivity, threshold: c.threshold, window: c.window, period: c.period, lambda: c.lambda });
-  const color = c.color ?? INSIGHT_COLORS.anomaly;
+  const color = c.color ?? IC.anomaly;
   const points = r.indices.map((j) => ff({ x: xValue(s.x[j], s.temporal), y: s.y[j], score: r.scores[j], expected: (r.lower[j] + r.upper[j]) / 2, series: s.name }));
   const when = r.indices.slice(0, 3).map((j) => formatValue(xValue(s.x[j], s.temporal)));
   const n = r.indices.length;
@@ -192,7 +195,7 @@ function runAnomalies(rm: ResolvedMark, s: SeriesData, c: Cfg<AnomalyInsight>, o
   if (c.show === false) return;
   if (c.band !== false) {
     const band = s.index.map((_, j) => ff({ x: xValue(s.x[j], s.temporal), lower: r.lower[j], upper: r.upper[j] }));
-    out.marks.push(createMark("areaY", band, { ...fo, x: "x", y1: "lower", y2: "upper", fill: color, fillOpacity: 0.08, silent: true, legend: false, id: `${rm.mark.id}:anomaly-band:${s.key ?? ""}`, z2: -1 }, true));
+    out.marks.push(createMark("areaY", band, { ...fo, x: "x", y1: "lower", y2: "upper", fill: IC.band, fillOpacity: 0.1, silent: true, legend: false, id: `${rm.mark.id}:anomaly-band:${s.key ?? ""}`, z2: -1 }, true));
   }
   if (points.length) {
     out.marks.push(
@@ -226,7 +229,7 @@ function runForecast(rm: ResolvedMark, s: SeriesData, c: Cfg<ForecastInsight>, o
     cur = iv ? iv.offset(cur, 1) : cur + (Number.isFinite(step) ? step : 1);
     future.push(cur);
   }
-  const color = c.color ?? INSIGHT_COLORS.forecast;
+  const color = c.color ?? IC.forecast;
   const lastY = s.y[s.y.length - 1];
   note(out, {
     kind: "forecast",
@@ -260,7 +263,7 @@ function runForecast(rm: ResolvedMark, s: SeriesData, c: Cfg<ForecastInsight>, o
 function runChangepoints(rm: ResolvedMark, s: SeriesData, c: Cfg<ChangepointInsight>, out: InsightOutput, ff: (r: Row) => Row, fo: Row, backendName: "js" | "wasm") {
   if (s.y.filter(Number.isFinite).length < 10) return;
   const r: ChangepointResult = getBackend().changepoints(s.y, { method: c.method, model: c.model, minSegment: c.minSegment, maxChangepoints: c.maxChangepoints, penalty: c.penalty });
-  const color = c.color ?? INSIGHT_COLORS.changepoint;
+  const color = c.color ?? IC.changepoint;
   const n = r.indices.length;
   const when = r.indices.slice(0, 3).map((j) => formatValue(xValue(s.x[j], s.temporal)));
   note(out, {
@@ -310,7 +313,7 @@ function runSeasonality(rm: ResolvedMark, s: SeriesData, c: Cfg<SeasonalityInsig
 function runTrend(rm: ResolvedMark, s: SeriesData, c: Cfg<TrendInsight>, out: InsightOutput, ff: (r: Row) => Row, fo: Row, backendName: "js" | "wasm") {
   if (s.y.filter(Number.isFinite).length < 3) return;
   const r: TrendResult = getBackend().trend(s.x, s.y, c.method ?? "ols");
-  const color = c.color ?? INSIGHT_COLORS.trend;
+  const color = c.color ?? IC.trend;
   const total = r.slope * (s.x[s.x.length - 1] - s.x[0]);
   note(out, {
     kind: "trend",
@@ -365,14 +368,14 @@ function runFrequencyOutliers(rm: ResolvedMark, I: readonly number[], c: Cfg<Fre
   const horizontal = rm.mark.type === "barX" || rm.mark.type === "rectX";
   const labels: Row[] = [];
   for (const [list, kind] of [[r.rare, "rare"], [r.dominant, "dominant"]] as [number[], "rare" | "dominant"][]) {
-    const color = c.color ?? INSIGHT_COLORS[kind];
+    const color = c.color ?? IC[kind];
     for (const k of list) {
       if (single) for (const i of cats.rows[k]) highlight(out, rm.mark.id, i, { color });
       labels.push(ff(horizontal ? { x: cats.totals[k], y: cats.values[k], text: kind, color } : { x: cats.values[k], y: cats.totals[k], text: kind, color }));
     }
   }
   if (labels.length) {
-    out.marks.push(createMark("text", labels, { ...fo, x: "x", y: "y", text: "text", fill: c.color ?? INSIGHT_COLORS.anomaly, fontSize: 10, fontWeight: "bold", position: horizontal ? "right" : "top", id: `${rm.mark.id}:frequency-labels`, z2: 6 }, true));
+    out.marks.push(createMark("text", labels, { ...fo, x: "x", y: "y", text: "text", fill: c.color ?? IC.anomaly, fontSize: 10, fontWeight: "bold", position: horizontal ? "right" : "top", id: `${rm.mark.id}:frequency-labels`, z2: 6 }, true));
   }
 }
 
@@ -429,7 +432,7 @@ function runCategoryOutliers(rm: ResolvedMark, I: readonly number[], c: Cfg<Cate
     summary: parts.length ? parts.join("; ") : "no category outliers",
   });
   if (c.show === false) return;
-  const color = c.color ?? INSIGHT_COLORS.outlier;
+  const color = c.color ?? IC.outlier;
   const single = groupSeries(rm, I).length === 1;
   const isBar = BAR_MARKS.has(rm.mark.type);
   const labels: Row[] = [];
@@ -466,7 +469,7 @@ function runSeriesOutliers(rm: ResolvedMark, series: SeriesData[], c: Cfg<Series
   const names = r.outlying.map((k) => series[k].name);
   note(out, { kind: "seriesOutliers", mark: rm.mark.id, method: r.method, backend: backendName, data: { ...r, series: series.map((s) => s.name) }, summary: names.length ? `outlying series: ${names.join(", ")}` : "no outlying series", warnings });
   if (c.show === false || r.outlying.length === 0) return;
-  const color = c.color ?? INSIGHT_COLORS.seriesOutlier;
+  const color = c.color ?? IC.seriesOutlier;
   let styles = out.seriesStyles.get(rm.mark.id);
   if (!styles) out.seriesStyles.set(rm.mark.id, (styles = new Map()));
   const outlying = new Set(r.outlying);
@@ -474,6 +477,6 @@ function runSeriesOutliers(rm: ResolvedMark, series: SeriesData[], c: Cfg<Series
   if (c.band !== false && r.bandMin.some(Number.isFinite)) {
     const temporal = series[0].temporal;
     const band = xs.map((x, i) => ff({ x: xValue(x, temporal), lower: Number.isFinite(r.bandMin[i]) ? r.bandMin[i] : null, upper: Number.isFinite(r.bandMax[i]) ? r.bandMax[i] : null }));
-    out.marks.push(createMark("areaY", band, { ...fo, x: "x", y1: "lower", y2: "upper", fill: INSIGHT_COLORS.band, fillOpacity: 0.1, silent: true, legend: false, id: `${rm.mark.id}:series-band`, z2: -1 }, true));
+    out.marks.push(createMark("areaY", band, { ...fo, x: "x", y1: "lower", y2: "upper", fill: IC.band, fillOpacity: 0.1, silent: true, legend: false, id: `${rm.mark.id}:series-band`, z2: -1 }, true));
   }
 }

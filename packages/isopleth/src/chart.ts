@@ -4,6 +4,7 @@ import type { EChartsOption } from "echarts";
 import type { Insight, Mark, Markish, PlotOptions } from "./types.js";
 import { compile, type Compiled } from "./compile/index.js";
 import type { Scales } from "./compile/scales.js";
+import type { Theme } from "./theme.js";
 
 export interface RenderOptions {
   /** `"canvas"` (default) or `"svg"`. */
@@ -37,7 +38,7 @@ export class Chart {
   readonly warnings: string[];
   readonly marks: Mark[];
   readonly scales: Scales;
-  readonly theme: "light" | "dark";
+  readonly theme: Theme;
   readonly options: PlotOptions;
   private compiled: Compiled;
 

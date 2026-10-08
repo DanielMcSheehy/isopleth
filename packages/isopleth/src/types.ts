@@ -285,6 +285,8 @@ export interface ColorScaleOptions {
   reverse?: boolean;
   /** Unknown/null color. */
   unknown?: string;
+  /** Per-value colour overrides: `{ "mobile": "#ff0", "web": "#0ff" }`. */
+  overrides?: Record<string, string>;
 }
 
 export interface FacetOptions {
@@ -312,8 +314,8 @@ export interface PlotOptions {
   color?: ColorScaleOptions;
   r?: { range?: [number, number]; domain?: [number, number] };
   facet?: FacetOptions;
-  /** `"light"` (default), `"dark"`, a registered ECharts theme name, or an object. */
-  theme?: string | Record<string, unknown>;
+  /** `"light"` (default), `"dark"`, `"ink"`, a theme registered with `defineTheme`, or a (partial) `Theme` object. */
+  theme?: string | Partial<import("./theme.js").Theme>;
   /** Plot-level insights, applied to every eligible mark. */
   insights?: InsightsConfig;
   /** Default: `"axis"` for line/area/bar charts, `"item"` for dots. */

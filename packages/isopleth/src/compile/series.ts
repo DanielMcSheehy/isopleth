@@ -2,7 +2,8 @@
 
 import type { Color, GradientSpec, Mark, MarkOptions, Value } from "../types.js";
 import { formatValue, isMissing, keyof, toNumber } from "../channel.js";
-import { fadeGradient, INSIGHT_COLORS, withOpacity } from "./palette.js";
+import { fadeGradient, inkOn, withOpacity } from "./palette.js";
+import type { Theme } from "../theme.js";
 import type { ResolvedMark } from "./resolve.js";
 import { coord, type PositionScale, type Scales } from "./scales.js";
 
@@ -34,7 +35,7 @@ export interface CompileContext {
   seriesStyles: Map<string, Map<string | number | boolean | null, SeriesStyle>>;
   /** Series that should get a continuous-color visualMap: filled by compilers. */
   visualTargets: { seriesId: string; dimension: number }[];
-  theme: "light" | "dark";
+  theme: Theme;
 }
 
 export interface CompiledMark {
@@ -157,7 +158,7 @@ function withHighlight(item: AnySeries | (number | string | null)[], rm: Resolve
   if (h.color) out.itemStyle = { ...(out.itemStyle ?? {}), color: h.color, borderColor: h.color };
   if (h.border) out.itemStyle = { ...(out.itemStyle ?? {}), borderColor: h.border, borderWidth: 2 };
   if (h.size) out.symbolSize = h.size;
-  if (h.label) out.label = { show: true, formatter: h.label, position: "top", color: h.color ?? INSIGHT_COLORS.anomaly, fontWeight: "bold" };
+  if (h.label) out.label = { show: true, formatter: h.label, position: "top", color: h.color ?? ctx.theme.insight.anomaly, fontWeight: "bold" };
   return out;
 }
 
@@ -184,11 +185,12 @@ function compileLine(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
       data,
       showSymbol: Boolean(o.symbols) || data.length === 1,
       symbol: o.symbol ?? "circle",
-      symbolSize: o.r !== undefined && typeof o.r === "number" ? o.r * 2 : 6,
+      symbolSize: o.r !== undefined && typeof o.r === "number" ? o.r * 2 : ctx.theme.mark.dotRadius * 2,
       connectNulls: Boolean(o.connectNulls),
-      lineStyle: { width: o.strokeWidth ?? 1.5, type: dashType(o), opacity: o.strokeOpacity ?? o.opacity ?? 1, ...(color ? { color } : {}) },
-      itemStyle: color ? { color } : {},
-      emphasis: { focus: "series" },
+      lineStyle: { width: o.strokeWidth ?? ctx.theme.mark.lineWidth, type: dashType(o), cap: "round", join: "round", opacity: o.strokeOpacity ?? o.opacity ?? 1, ...(color ? { color } : {}) },
+      itemStyle: { ...(color ? { color } : {}), borderColor: ctx.theme.background, borderWidth: ctx.theme.mark.gap },
+      emphasis: { focus: "series", lineStyle: { width: (o.strokeWidth ?? ctx.theme.mark.lineWidth) + 1 } },
+      blur: { lineStyle: { opacity: 0.25 } },
       smooth: o.curve ? (curveSmooth[o.curve] ?? false) : false,
       ...(o.curve && curveStep[o.curve] ? { step: curveStep[o.curve] } : {}),
       ...(data.length > 5000 ? { sampling: "lttb" } : {}),
@@ -270,10 +272,14 @@ function compileArea(rm: ResolvedMark, I: number[], ctx: CompileContext, horizon
   const stroke = rm.constants.stroke;
   groups.forEach((g, k) => {
     const color = colorFor(rm, g, ctx, "fill");
-    const fillOpacity = o.fillOpacity ?? o.opacity ?? (multi ? 0.85 : 0.35);
-    const areaColor = o.gradient && typeof color === "string" ? (Array.isArray(o.gradient) ? verticalGradient(o.gradient) : fadeGradient(color, fillOpacity, 0.02)) : color;
+    const fillOpacity = o.fillOpacity ?? o.opacity ?? (multi ? ctx.theme.mark.stackOpacity : ctx.theme.mark.areaOpacity);
+    const areaColor = o.gradient && typeof color === "string" ? (Array.isArray(o.gradient) ? verticalGradient(o.gradient) : multi ? fadeGradient(color, 0.95, 0.55) : fadeGradient(color, Math.max(0.45, fillOpacity * 3), 0.03)) : color;
     const pair = (i: number, v: Value) => (horizontal ? [coord(bs, v), coord(ps, P[i])] : [coord(ps, P[i]), coord(bs, v)]);
-    const lineStyle = stroke ? { width: o.strokeWidth ?? 1, color: stroke, opacity: o.strokeOpacity ?? 1, type: dashType(o) } : { width: 0, opacity: 0 };
+    const lineStyle = stroke
+      ? { width: o.strokeWidth ?? ctx.theme.mark.lineWidth, color: stroke, opacity: o.strokeOpacity ?? 1, type: dashType(o), cap: "round", join: "round" }
+      : multi && mode === "native"
+        ? { width: ctx.theme.mark.gap / 2, color: ctx.theme.background, opacity: 1 }
+        : { width: 0, opacity: 0 };
     const common = {
       type: "line",
       showSymbol: false,
@@ -295,9 +301,11 @@ function compileArea(rm: ResolvedMark, I: number[], ctx: CompileContext, horizon
         ...common,
         data,
         ...(mode === "native" ? { stack: rm.mark.id, stackStrategy: "samesign" } : {}),
-        lineStyle: { ...lineStyle, ...(color && !stroke ? { color } : {}) },
+        lineStyle: { ...lineStyle, ...(color && !stroke && !(multi && mode === "native") ? { color } : {}) },
         areaStyle: { color: areaColor, opacity: o.gradient ? 1 : fillOpacity, origin: "auto" },
         itemStyle: color ? { color } : {},
+        emphasis: { focus: "series" },
+        blur: { areaStyle: { opacity: 0.2 } },
       };
       applySeriesStyle(s, rm, g, ctx);
       series.push(s);
@@ -408,12 +416,28 @@ function compileBar(rm: ResolvedMark, I: number[], ctx: CompileContext, horizont
     const color = colorFor(rm, g, ctx, "fill");
     const zeroBase = !B1 || isZeroBase(B1, g.index);
     const label = o.label ? { show: true, position: horizontal ? "right" : "top", formatter: typeof o.label === "string" ? o.label : undefined } : undefined;
-    const itemStyle: AnySeries = { ...(color ? { color } : {}), opacity: o.fillOpacity ?? o.opacity ?? 1, borderRadius: (o as Record<string, unknown>).borderRadius };
+    const stackedMark = mode !== "single" && !dodge && groups.length > 1;
+    const r = ctx.theme.mark.barRadius;
+    const radius = (o as Record<string, unknown>).borderRadius ?? (stackedMark ? 0 : horizontal ? [0, r, r, 0] : [r, r, 0, 0]);
+    const itemStyle: AnySeries = { ...(color ? { color } : {}), opacity: o.fillOpacity ?? o.opacity ?? 1, borderRadius: radius };
     if (rm.constants.stroke) {
       itemStyle.borderColor = rm.constants.stroke;
       itemStyle.borderWidth = o.strokeWidth ?? 1;
+    } else if (stackedMark) {
+      // The surface gap between stacked segments.
+      itemStyle.borderColor = ctx.theme.background;
+      itemStyle.borderWidth = ctx.theme.mark.gap / 2;
     }
-    const common = { type: "bar", barCategoryGap: `${Math.round((ps.options.padding ?? 0.2) * 100)}%`, barMaxWidth: 80, ...(bandsUsed ? { barGap: "-100%" } : dodge ? { barGap: "10%" } : {}), label, itemStyle, emphasis: { focus: "series" } };
+    const common = {
+      type: "bar",
+      barCategoryGap: `${Math.round((ps.options.padding ?? 0.3) * 100)}%`,
+      barMaxWidth: (o as Record<string, unknown>).barMaxWidth ?? ctx.theme.mark.barMaxWidth,
+      ...(bandsUsed ? { barGap: "-100%" } : dodge ? { barGap: "12%" } : {}),
+      label,
+      itemStyle,
+      emphasis: { focus: "series" },
+      blur: { itemStyle: { opacity: 0.25 } },
+    };
     if (mode === "native" || zeroBase || dodge) {
       const data = g.index.map((i) => {
         const v2 = toNumber(B2[i]);
@@ -480,7 +504,7 @@ function compileRect(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
   if (ordinalY && !ordinalX && (Y1 === undefined || Y2 === undefined)) return compileBar(rm, I, ctx, true);
   if (!X1 || !X2 || !Y2) return { series: [], legend: [], tooltip: "item" };
   const colorDim = continuousColorDim(rm);
-  const inset = o.inset ?? 0.5;
+  const inset = o.inset ?? ctx.theme.mark.gap / 2;
   const series: AnySeries[] = [];
   const legend: string[] = [];
   const { names: tipNames, values: tipValues } = tooltipDims(rm);
@@ -552,8 +576,10 @@ function compileCell(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
   const { names: tipNames, values: tipValues } = tooltipDims(rm);
   const data = I.map((i) => {
     const row: AnySeries = { value: [coord(xs, X[i]), coord(ys, Y[i]), fill ? (continuous ? toNumber(fill[i]) : formatValue(fill[i])) : 1, ...tipValues.map((v) => formatValue(v[i]))] };
-    if (fill && !continuous) row.itemStyle = { color: ctx.scales.color.colorOf(fill[i]) };
+    const cellColor = fill ? ctx.scales.color.colorOf(fill[i]) : (constant as string | undefined);
+    if (fill && !continuous) row.itemStyle = { color: cellColor };
     else if (constant) row.itemStyle = { color: constant };
+    if (o.label && cellColor) row.label = { color: inkOn(cellColor) };
     const h = ctx.highlights.get(rm.mark.id)?.get(i);
     if (h?.color) row.itemStyle = { ...(row.itemStyle ?? {}), borderColor: h.color, borderWidth: 2 };
     return row;
@@ -565,8 +591,8 @@ function compileCell(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
     data,
     dimensions: ["x", "y", rm.labels.fill ?? "value", ...tipNames],
     encode: { x: 0, y: 1, value: 2, tooltip: [2, ...tipNames.map((_, j) => 3 + j)] },
-    label: o.label ? { show: true, formatter: (p: any) => formatValue(p.value[2]) } : { show: false },
-    itemStyle: { borderColor: ctx.theme === "dark" ? "#111" : "#fff", borderWidth: o.inset ?? 1, opacity: o.fillOpacity ?? o.opacity ?? 1 },
+    label: o.label ? { show: true, fontSize: 11, fontFamily: ctx.theme.font, formatter: (p: any) => formatValue(p.value[2]) } : { show: false },
+    itemStyle: { borderColor: ctx.theme.background, borderWidth: o.inset ?? ctx.theme.mark.gap, borderRadius: 3, opacity: o.fillOpacity ?? o.opacity ?? 1 },
     emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.3)" } },
   };
   if (continuous) ctx.visualTargets.push({ seriesId: s.id, dimension: 2 });
@@ -602,14 +628,18 @@ function compileDot(rm: ResolvedMark, I: number[], ctx: CompileContext): Compile
       dimensions: ["x", "y", rm.labels.r ?? "r", rm.labels.fill ?? rm.labels.stroke ?? "color", ...tipNames],
       encode: { x: 0, y: 1, tooltip: [0, 1, ...(R ? [2] : []), ...(colorDim ? [3] : []), ...tipNames.map((_, j) => 4 + j)] },
       symbol: o.symbol ?? "circle",
-      symbolSize: R ? (value: any) => r.sizeOf(value[2]) * 2 : (constR ?? 3) * 2,
+      symbolSize: R ? (value: any) => r.sizeOf(value[2]) * 2 : (constR ?? ctx.theme.mark.dotRadius) * 2,
       itemStyle: {
         ...(color ? { color } : {}),
-        opacity: o.fillOpacity ?? o.opacity ?? (rm.constants.fill === "none" ? 1 : 0.85),
+        opacity: o.fillOpacity ?? o.opacity ?? 1,
+        // Surface ring so dots stay legible where they overlap.
+        borderColor: ctx.theme.background,
+        borderWidth: ctx.theme.mark.gap / 2,
         ...(rm.constants.stroke ? { borderColor: rm.constants.stroke, borderWidth: o.strokeWidth ?? 1 } : {}),
         ...(rm.constants.fill === "none" ? { color: "transparent", borderColor: typeof color === "string" ? color : undefined, borderWidth: o.strokeWidth ?? 1.5 } : {}),
       },
       emphasis: { focus: "series", scale: 1.4 },
+      blur: { itemStyle: { opacity: 0.2 } },
       ...(data.length > 5000 ? { large: true, largeThreshold: 5000 } : {}),
     };
     if (colorDim) ctx.visualTargets.push({ seriesId: s.id, dimension: 3 });
@@ -632,7 +662,7 @@ function compileRule(rm: ResolvedMark, I: number[], ctx: CompileContext, vertica
   const ps = vertical ? xs : ys;
   const ss = vertical ? ys : xs;
   const T = rm.channels.text ?? rm.channels.title;
-  const color = rm.constants.stroke ?? rm.constants.fill ?? (rm.channels.stroke && ctx.scales.color.kind === "categorical" ? undefined : ctx.theme === "dark" ? "#aaa" : "#555");
+  const color = rm.constants.stroke ?? rm.constants.fill ?? (rm.channels.stroke && ctx.scales.color.kind === "categorical" ? undefined : ctx.theme.textMuted);
   const lineStyle = { width: o.strokeWidth ?? 1, type: dashType(o), opacity: o.strokeOpacity ?? o.opacity ?? 1, ...(color ? { color } : {}) };
   const g: SeriesGroup = { key: null, value: undefined, index: I };
   if (S2 === undefined && S1 === undefined) {
@@ -709,9 +739,10 @@ function compileText(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
       position: (o as Record<string, unknown>).position ?? "top",
       offset: [o.dx ?? 0, o.dy ?? 0],
       fontSize: (o as Record<string, unknown>).fontSize ?? 11,
-      color: color ?? (ctx.theme === "dark" ? "#eee" : "#333"),
+      color: color ?? ctx.theme.text,
+      fontFamily: ctx.theme.font,
       fontWeight: (o as Record<string, unknown>).fontWeight,
-      textBorderColor: ctx.theme === "dark" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.8)",
+      textBorderColor: withOpacity(ctx.theme.background, 0.85),
       textBorderWidth: 2,
     },
     labelLayout: { hideOverlap: true },
@@ -729,8 +760,8 @@ function compileDifference(rm: ResolvedMark, I: number[], ctx: CompileContext): 
   const Y1 = rm.channels.y1!;
   const Y2 = rm.channels.y2!;
   const series: AnySeries[] = [];
-  const positive = o.positiveFill ?? INSIGHT_COLORS.positive;
-  const negative = o.negativeFill ?? INSIGHT_COLORS.negative;
+  const positive = o.positiveFill ?? ctx.theme.insight.positive;
+  const negative = o.negativeFill ?? ctx.theme.insight.negative;
   const fillOpacity = o.fillOpacity ?? 0.5;
   groupSeries(rm, I).forEach((g, k) => {
     // Comparison series resampled onto the metric's x positions (needed for shiftX).
@@ -766,13 +797,13 @@ function compileDifference(rm: ResolvedMark, I: number[], ctx: CompileContext): 
     // Positive: metric above comparison; negative: below. Crossing points were inserted so each band collapses to zero height on the other side.
     series.push(mk("positive", pc.map((c, j) => Math.min(c, pm[j])), pm, positive, o.positiveFillOpacity ?? fillOpacity, "pos"));
     series.push(mk("negative", pm, pc.map((c, j) => Math.max(c, pm[j])), negative, o.negativeFillOpacity ?? fillOpacity, "neg"));
-    const stroke = rm.constants.stroke ?? (ctx.theme === "dark" ? "#eee" : "#222");
+    const stroke = rm.constants.stroke ?? ctx.theme.text;
     series.push({
       ...baseSeries(rm, g, ctx, k),
       type: "line",
       data: xm.map((x, j) => [asCoord(x), Number.isFinite(ym[j]) ? ym[j] : null]),
       showSymbol: false,
-      lineStyle: { width: o.strokeWidth ?? 1.5, color: stroke, opacity: o.strokeOpacity ?? 1 },
+      lineStyle: { width: o.strokeWidth ?? ctx.theme.mark.lineWidth, color: stroke, opacity: o.strokeOpacity ?? 1, cap: "round", join: "round" },
       itemStyle: { color: stroke },
       emphasis: { focus: "series" },
     });

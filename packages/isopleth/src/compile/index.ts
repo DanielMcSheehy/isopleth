@@ -11,6 +11,8 @@ import { applyInsights } from "../insights/index.js";
 import { planFacets, resolveMark, type FacetPlan, type ResolvedMark } from "./resolve.js";
 import { inferScales, type PositionScale, type Scales } from "./scales.js";
 import { compileMark, isBarLike, type AnySeries, type CompileContext } from "./series.js";
+import { resolveTheme, type Theme } from "../theme.js";
+import { withOpacity } from "./palette.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -22,23 +24,23 @@ export interface Compiled {
   marks: Mark[];
   resolved: ResolvedMark[];
   plan: FacetPlan;
-  theme: "light" | "dark";
+  theme: Theme;
 }
 
 export function compile(options: PlotOptions): Compiled {
   const userMarks = flattenMarks(options.marks);
   const plan = planFacets(userMarks, options);
   const resolved = userMarks.map((m) => resolveMark(m, plan, options));
-  const theme: "light" | "dark" = options.theme === "dark" ? "dark" : "light";
+  const theme = resolveTheme(options.theme);
 
   // Insights add marks; resolve those too so scales include forecasts/bands.
-  const ins = applyInsights(resolved, plan, options);
+  const ins = applyInsights(resolved, plan, options, theme);
   const generated = ins.marks.map((m) => resolveMark(m, plan, options));
   const all = [...resolved, ...generated].filter((rm) => !["frame", "gridX", "gridY"].includes(rm.mark.type));
   // Draw order: generated bands (z2 < 0) first, then user marks, then generated overlays.
   all.sort((a, b) => (a.mark.options.z2 ?? 0) - (b.mark.options.z2 ?? 0));
 
-  const scales = inferScales(all, plan.keys.length, options);
+  const scales = inferScales(all, plan.keys.length, options, theme);
   const nFacets = plan.keys.length;
   const ctx: CompileContext = { scales, facet: 0, animation: options.animation ?? true, highlights: ins.highlights, seriesStyles: ins.seriesStyles, visualTargets: [], theme };
 
@@ -70,33 +72,74 @@ export function compile(options: PlotOptions): Compiled {
   const tooltipTrigger = options.tooltip === "item" ? "item" : options.tooltip === "axis" ? "axis" : tooltipVotes.item > tooltipVotes.axis ? "item" : "axis";
   const titles: any[] = [];
   const subtitle = subtitleLines.join("\n");
-  if (options.title || subtitle) titles.push({ text: options.title, subtext: subtitle || undefined, left: 8, top: 4, textStyle: { fontSize: 15 }, subtextStyle: { fontSize: 11, lineHeight: 15 } });
-  if (options.caption) titles.push({ text: options.caption, left: 8, bottom: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: theme === "dark" ? "#aaa" : "#666" } });
+  if (options.title || subtitle) {
+    titles.push({
+      text: options.title,
+      subtext: subtitle || undefined,
+      left: 8,
+      top: 4,
+      textStyle: { fontSize: 15, fontWeight: 600, color: theme.text, fontFamily: theme.font },
+      subtextStyle: { fontSize: 11, lineHeight: 15, color: theme.textMuted, fontFamily: theme.font },
+    });
+  }
+  if (options.caption) titles.push({ text: options.caption, left: 8, bottom: 0, textStyle: { fontSize: 11, fontWeight: "normal", color: theme.textMuted, fontFamily: theme.font } });
   if (nFacets > 1) {
     plan.keys.forEach((k, f) => {
       const g = layout.grids[f];
       const label = [k.fx, k.fy].filter((v) => v !== undefined).map((v) => formatValue(v)).join(" / ");
-      titles.push({ text: label, left: g.left, top: `${Math.max(0, parseFloat(g.top) - 4).toFixed(3)}%`, textStyle: { fontSize: 11, fontWeight: "normal" } });
+      titles.push({ text: label, left: g.left, top: `${Math.max(0, parseFloat(g.top) - 4).toFixed(3)}%`, textStyle: { fontSize: 11, fontWeight: 600, color: theme.textSecondary, fontFamily: theme.font } });
     });
   }
 
   const visualMap = buildVisualMaps(ctx, series, scales, theme, hasLegend);
-  const dataZoom = buildDataZoom(scales, nFacets, hasLegend);
-  const legendOpt = !hasLegend ? { show: false } : { show: true, data: legendNames, bottom: options.caption ? 16 : 0, type: legendNames.length > 12 ? "scroll" : "plain", ...(typeof options.legend === "object" ? options.legend : {}) };
+  const dataZoom = buildDataZoom(scales, nFacets, hasLegend, theme);
+  const legendOpt = !hasLegend
+    ? { show: false }
+    : {
+        show: true,
+        data: legendNames,
+        bottom: options.caption ? 16 : 0,
+        type: legendNames.length > 12 ? "scroll" : "plain",
+        icon: "roundRect",
+        itemWidth: 14,
+        itemHeight: 6,
+        itemGap: 14,
+        textStyle: { color: theme.textSecondary, fontSize: 11, fontFamily: theme.font },
+        pageTextStyle: { color: theme.textMuted },
+        pageIconColor: theme.textSecondary,
+        pageIconInactiveColor: theme.grid,
+        inactiveColor: theme.grid,
+        ...(typeof options.legend === "object" ? options.legend : {}),
+      };
   const tooltip =
     options.tooltip === false
       ? { show: false }
       : {
           trigger: tooltipTrigger,
           confine: true,
-          axisPointer: { type: tooltipTrigger === "axis" ? "cross" : "line", snap: true, label: { show: tooltipTrigger === "axis" } },
+          backgroundColor: theme.surface,
+          borderColor: theme.grid,
+          borderWidth: 1,
+          padding: [8, 10],
+          extraCssText: "box-shadow: 0 6px 24px rgba(0,0,0,0.18); border-radius: 8px;",
+          textStyle: { color: theme.text, fontSize: 12, fontFamily: theme.font },
+          axisPointer: {
+            type: tooltipTrigger === "axis" ? "line" : "none",
+            snap: true,
+            lineStyle: { color: theme.textMuted, width: 1, type: "dashed" },
+            crossStyle: { color: theme.textMuted },
+            label: { show: tooltipTrigger === "axis", backgroundColor: theme.textSecondary, color: theme.background, fontSize: 11 },
+          },
           valueFormatter: (v: unknown) => (Array.isArray(v) ? v.map((x) => formatValue(x as Value)).join(", ") : formatValue(v as Value)),
           ...(typeof options.tooltip === "object" ? options.tooltip : {}),
         };
 
   const option: EChartsOption = {
     animation: options.animation ?? true,
+    animationDuration: 600,
+    animationEasing: "cubicOut",
     backgroundColor: options.background ?? "transparent",
+    textStyle: { fontFamily: theme.font, color: theme.text },
     ...(scales.color.kind === "categorical" ? { color: scales.color.range } : {}),
     title: titles,
     grid: layout.grids.map((g) => ({ ...g, containLabel: false, outerBoundsMode: "auto" })),
@@ -181,7 +224,7 @@ function facetLayout(plan: FacetPlan, options: PlotOptions, needs: LayoutNeeds):
 
 // ---------------------------------------------------------------- axes ---
 
-function axisOption(axis: "x" | "y", scale: PositionScale, f: number, plan: FacetPlan, options: PlotOptions, marks: Mark[], theme: "light" | "dark"): any {
+function axisOption(axis: "x" | "y", scale: PositionScale, f: number, plan: FacetPlan, options: PlotOptions, marks: Mark[], theme: Theme): any {
   const o: ScaleOptions = scale.options;
   const cols = Math.max(1, plan.xs.length || 1);
   const rows = Math.max(1, plan.ys.length || 1);
@@ -196,12 +239,13 @@ function axisOption(axis: "x" | "y", scale: PositionScale, f: number, plan: Face
     show: o.axis !== null,
     name: isEdge ? scale.label : undefined,
     nameLocation: "middle",
-    nameGap: axis === "x" ? 26 : 36,
-    nameTextStyle: { fontSize: 11, color: theme === "dark" ? "#bbb" : "#555" },
-    axisLabel: { hideOverlap: true, fontSize: 11, showMaxLabel: undefined },
-    splitLine: { show: o.grid ?? (axis === "y" && scale.type !== "ordinal"), lineStyle: { opacity: 0.35, type: "dashed" } },
-    axisTick: { show: scale.type === "ordinal", alignWithLabel: true },
-    axisLine: { show: scale.type === "ordinal" || axis === "x" },
+    nameGap: axis === "x" ? 28 : 40,
+    nameTextStyle: { fontSize: 11, color: theme.textSecondary, fontFamily: theme.font },
+    axisLabel: { hideOverlap: true, fontSize: 11, color: theme.textSecondary, fontFamily: theme.font, margin: 10, showMaxLabel: undefined },
+    splitLine: { show: o.grid ?? (axis === "y" && scale.type !== "ordinal"), lineStyle: { color: theme.grid, width: 1, type: "solid" } },
+    axisTick: { show: scale.type === "ordinal", alignWithLabel: true, length: 4, lineStyle: { color: theme.axis } },
+    axisLine: { show: scale.type === "ordinal" || axis === "x", lineStyle: { color: theme.axis, width: 1 } },
+    axisPointer: { lineStyle: { color: theme.textMuted } },
     inverse: Boolean(o.reverse),
   };
   if (scale.type === "ordinal") {
@@ -242,7 +286,7 @@ function axisOption(axis: "x" | "y", scale: PositionScale, f: number, plan: Face
 
 // ----------------------------------------------------------- visual map ---
 
-function buildVisualMaps(ctx: CompileContext, series: AnySeries[], scales: Scales, theme: "light" | "dark", hasLegend: boolean): any[] {
+function buildVisualMaps(ctx: CompileContext, series: AnySeries[], scales: Scales, theme: Theme, hasLegend: boolean): any[] {
   void hasLegend;
   if (ctx.visualTargets.length === 0 || scales.color.kind !== "continuous") return [];
   const byDim = new Map<number, number[]>();
@@ -270,13 +314,15 @@ function buildVisualMaps(ctx: CompileContext, series: AnySeries[], scales: Scale
     itemWidth: 12,
     itemHeight: 120,
     text: scales.color.label ? [`${scales.color.label}`, ""] : undefined,
-    textStyle: { fontSize: 11, color: theme === "dark" ? "#bbb" : "#555" },
+    textStyle: { fontSize: 11, color: theme.textSecondary, fontFamily: theme.font },
+    handleStyle: { borderColor: theme.textMuted },
+    indicatorStyle: { borderColor: theme.text },
     formatter: (v: number) => formatValue(v),
     precision: Number.isInteger(lo) && Number.isInteger(hi) ? 0 : 2,
   }));
 }
 
-function buildDataZoom(scales: Scales, nFacets: number, hasLegend: boolean): any[] {
+function buildDataZoom(scales: Scales, nFacets: number, hasLegend: boolean, theme: Theme): any[] {
   const out: any[] = [];
   const all = Array.from({ length: nFacets }, (_, i) => i);
   for (const [axis, scale] of [["x", scales.x], ["y", scales.y]] as const) {
@@ -284,7 +330,25 @@ function buildDataZoom(scales: Scales, nFacets: number, hasLegend: boolean): any
     if (!z) continue;
     const idx = axis === "x" ? { xAxisIndex: all } : { yAxisIndex: all };
     if (z === true || z === "inside") out.push({ type: "inside", ...idx, filterMode: "none" });
-    if (z === true || z === "slider") out.push({ type: "slider", ...idx, filterMode: "none", height: 18, bottom: hasLegend ? 30 : 6 });
+    if (z === true || z === "slider") {
+      out.push({
+        type: "slider",
+        ...idx,
+        filterMode: "none",
+        height: 20,
+        bottom: hasLegend ? 30 : 6,
+        borderColor: theme.grid,
+        backgroundColor: "transparent",
+        fillerColor: withOpacity(theme.accent, 0.12),
+        dataBackground: { lineStyle: { color: theme.textMuted, opacity: 0.6 }, areaStyle: { color: theme.textMuted, opacity: 0.12 } },
+        selectedDataBackground: { lineStyle: { color: theme.accent }, areaStyle: { color: theme.accent, opacity: 0.2 } },
+        handleStyle: { color: theme.surface, borderColor: theme.textMuted },
+        moveHandleStyle: { color: theme.grid },
+        emphasis: { handleStyle: { borderColor: theme.accent } },
+        textStyle: { color: theme.textMuted, fontSize: 10 },
+        brushSelect: false,
+      });
+    }
   }
   return out;
 }

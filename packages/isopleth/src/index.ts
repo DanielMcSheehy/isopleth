@@ -47,6 +47,8 @@ export { selectFirst, selectLast, selectMinX, selectMaxX, selectMinY, selectMaxY
 export { identity, indexOf, valueof, inferType, isColor, formatValue } from "./channel.js";
 export { numberInterval, utcInterval, maybeInterval, medianStep, guessTimeInterval } from "./interval.js";
 export { SCHEMES, INSIGHT_COLORS, fadeGradient, withOpacity } from "./compile/palette.js";
+export { themes, light as lightTheme, dark as darkTheme, ink as inkTheme, defineTheme, resolveTheme, themeToCSSVars } from "./theme.js";
+export type { Theme, ThemeInsightColors, ThemeMarkSpecs } from "./theme.js";
 
 // Backend
 export { getBackend, useBackend, init, jsBackend } from "./backend/index.js";

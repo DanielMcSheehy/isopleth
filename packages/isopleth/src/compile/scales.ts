@@ -3,7 +3,8 @@
 import type { ColorScaleOptions, PlotOptions, ScaleOptions, ScaleType, Value } from "../types.js";
 import { ascending, descending, inferType, isMissing, keyof, toNumber } from "../channel.js";
 import { getBackend } from "../backend/index.js";
-import { DEFAULT_CATEGORICAL, DEFAULT_DIVERGING, DEFAULT_SEQUENTIAL, scheme } from "./palette.js";
+import { scheme } from "./palette.js";
+import type { Theme } from "../theme.js";
 import type { ResolvedMark } from "./resolve.js";
 import { typeOfChannels } from "./resolve.js";
 
@@ -206,7 +207,7 @@ function sortedDomain(axis: "x" | "y", marks: ResolvedMark[], names: readonly st
   return undefined;
 }
 
-function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}): ColorScale {
+function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}, theme: Theme): ColorScale {
   const chans: Value[][] = [];
   let label: string | undefined;
   for (const m of marks) {
@@ -233,14 +234,20 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}): Col
     };
     if (options.domain) (options.domain as Value[]).forEach(push);
     else for (const c of chans) for (const v of c) push(v);
-    let range = options.range ?? scheme(options.scheme, DEFAULT_CATEGORICAL);
+    let range = options.range ?? (options.scheme ? scheme(options.scheme, "observable10") : theme.categorical);
     if (options.reverse) range = range.slice().reverse();
+    const overrides = new Map<string | number | boolean | null, string>();
+    if (options.overrides) for (const [k, c] of Object.entries(options.overrides)) overrides.set(k, c);
     const colorOf = (v: Value) => {
-      const i = index.get(keyof(v));
-      if (i === undefined) return options.unknown ?? "#9498a0";
+      const k = keyof(v);
+      const o = overrides.get(k) ?? overrides.get(String(k));
+      if (o) return o;
+      const i = index.get(k);
+      if (i === undefined) return options.unknown ?? theme.textMuted;
       return range[i % range.length];
     };
-    return { kind: "categorical", domain, range, colorOf, extent: [0, 1], stops: [], label: options.label ?? label, legend: options.legend ?? domain.length > 1, options, index };
+    const effectiveRange = domain.map((v) => colorOf(v));
+    return { kind: "categorical", domain, range: effectiveRange.length ? effectiveRange : range, colorOf, extent: [0, 1], stops: [], label: options.label ?? label, legend: options.legend ?? domain.length > 1, options, index };
   }
   // Continuous.
   let lo = Infinity;
@@ -256,7 +263,7 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}): Col
     hi = toNumber(options.domain[1] as Value);
   }
   const diverging = options.type === "diverging";
-  let stops = options.range ?? scheme(options.scheme, diverging ? DEFAULT_DIVERGING : DEFAULT_SEQUENTIAL);
+  let stops = options.range ?? (options.scheme ? scheme(options.scheme, "viridis") : diverging ? theme.diverging : theme.sequential);
   if (options.reverse) stops = stops.slice().reverse();
   if (diverging && !options.domain) {
     const m = Math.max(Math.abs(lo), Math.abs(hi));
@@ -265,7 +272,7 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}): Col
   }
   const colorOf = (v: Value) => {
     const x = toNumber(v);
-    if (!Number.isFinite(x)) return options.unknown ?? "#9498a0";
+    if (!Number.isFinite(x)) return options.unknown ?? theme.textMuted;
     const t = hi === lo ? 0.5 : Math.min(1, Math.max(0, (x - lo) / (hi - lo)));
     return interpolateStops(stops, t);
   };
@@ -304,7 +311,7 @@ function rScale(marks: ResolvedMark[], options: PlotOptions["r"] = {}): RScale {
     }
   }
   if (options.domain) [lo, hi] = options.domain;
-  const range = options.range ?? [1.5, 8];
+  const range = options.range ?? [2, 9];
   const sizeOf = (v: Value) => {
     const n = toNumber(v);
     if (!Number.isFinite(n) || hi <= 0) return range[0];
@@ -315,11 +322,11 @@ function rScale(marks: ResolvedMark[], options: PlotOptions["r"] = {}): RScale {
   return { extent: [Number.isFinite(lo) ? lo : 0, Number.isFinite(hi) ? hi : 1], range, sizeOf };
 }
 
-export function inferScales(marks: ResolvedMark[], nFacets: number, options: PlotOptions): Scales {
+export function inferScales(marks: ResolvedMark[], nFacets: number, options: PlotOptions, theme: Theme): Scales {
   return {
     x: positionScale("x", marks, nFacets, options.x),
     y: positionScale("y", marks, nFacets, options.y),
-    color: colorScale(marks, options.color),
+    color: colorScale(marks, options.color, theme),
     r: rScale(marks, options.r),
   };
 }

@@ -10,6 +10,7 @@ interface Example {
   make: (theme: "light" | "dark") => ip.Chart;
 }
 
+const T = (theme: "light" | "dark") => ip.themes[theme];
 const ts = timeseries();
 const web = single();
 const peng = penguins();
@@ -39,20 +40,14 @@ const examples: Example[] = [
   {
     id: "stacked-area",
     title: "stacked areas, rolling mean, gradients",
-    description: "areaY stacks series automatically; windowY smooths each series with a 7-day centred mean; gradient fades the fills.",
+    description: "areaY stacks series automatically; windowY smooths each series with a 7-day centred mean; gradient fades the fills. Stacked segments are separated by a hairline in the surface colour.",
     code: `ip.plot({
-  marks: [
-    ip.areaY(ts, ip.windowY(7, { x: "date", y: "value", fill: "series", gradient: true })),
-    ip.lineY(ts, ip.windowY(7, ip.stackY({ x: "date", y: "value", stroke: "series", strokeWidth: 1 }))),
-  ],
+  marks: [ip.areaY(ts, ip.windowY(7, { x: "date", y: "value", fill: "series", gradient: true }))],
   y: { label: "requests / day" },
 })`,
     make: (theme) =>
       ip.plot({
-        marks: [
-          ip.areaY(ts, ip.windowY(7, { x: "date", y: "value", fill: "series", gradient: true })),
-          ip.lineY(ts, ip.windowY(7, ip.stackY2({ x: "date", y: "value", stroke: "series", strokeWidth: 1 }))),
-        ],
+        marks: [ip.areaY(ts, ip.windowY(7, { x: "date", y: "value", fill: "series", gradient: true }))],
         y: { label: "requests / day" },
         theme,
       }),
@@ -98,7 +93,7 @@ const examples: Example[] = [
 })`,
     make: (theme) =>
       ip.plot({
-        marks: [ip.barY(statuses, ip.groupX({ y: "count" }, { x: "kind", fill: "#4269d0", sort: { x: "-y" } }))],
+        marks: [ip.barY(statuses, ip.groupX({ y: "count" }, { x: "kind", fill: T(theme).categorical[0], sort: { x: "-y" } }))],
         insights: { frequencyOutliers: true },
         x: { label: "HTTP status" },
         y: { label: "requests" },
@@ -126,13 +121,12 @@ const examples: Example[] = [
     title: "heatmap (cell + group)",
     description: "group on two ordinal channels; a continuous fill gets a visualMap.",
     code: `ip.plot({
-  marks: [ip.cell(sales, ip.group({ fill: "sum" }, { x: "region", y: "product", fill: "revenue" }))],
-  color: { scheme: "ylgnbu" },
+  marks: [ip.cell(sales, ip.group({ fill: "sum" }, { x: "region", y: "product", fill: "revenue", label: true }))],
 })`,
     make: (theme) =>
       ip.plot({
         marks: [ip.cell(sl, ip.group({ fill: "sum" }, { x: "region", y: "product", fill: "revenue", label: true }))],
-        color: { scheme: "ylgnbu", label: "revenue" },
+        color: { label: "revenue" },
         theme,
       }),
   },
@@ -193,16 +187,16 @@ const examples: Example[] = [
     code: `const sparse = web.filter((d) => d.date.getUTCDate() % 6 !== 0);
 ip.plot({
   marks: [
-    ip.lineY(sparse, ip.imputeY("linear", ip.intervalX("day", { x: "date", y: "value", stroke: "#9498a0", strokeDasharray: "3 3" }))),
-    ip.lineY(sparse, { x: "date", y: "value", interval: "day", stroke: "#4269d0" }),
+    ip.lineY(sparse, ip.imputeY("linear", ip.intervalX("day", { x: "date", y: "value", stroke: theme.textMuted, strokeDasharray: "3 3" }))),
+    ip.lineY(sparse, { x: "date", y: "value", interval: "day" }),
   ],
 })`,
     make: (theme) => {
       const sparse = web.filter((d) => d.date.getUTCDate() % 6 !== 0 && d.date.getUTCDate() % 7 !== 0);
       return ip.plot({
         marks: [
-          ip.lineY(sparse, ip.imputeY("linear", ip.intervalX("day", { x: "date", y: "value", stroke: "#9498a0", strokeDasharray: "3 3", name: "imputed" }))),
-          ip.lineY(sparse, { x: "date", y: "value", interval: "day", stroke: "#4269d0", name: "observed" }),
+          ip.lineY(sparse, ip.imputeY("linear", ip.intervalX("day", { x: "date", y: "value", stroke: T(theme).textMuted, strokeDasharray: "3 3", name: "imputed" }))),
+          ip.lineY(sparse, { x: "date", y: "value", interval: "day", stroke: T(theme).categorical[0], name: "observed" }),
         ],
         theme,
       });
@@ -233,16 +227,16 @@ ip.plot({
     description: "windowY with min and max reducers (O(n) monotonic deques) draws a 14-day envelope around the raw series.",
     code: `ip.plot({
   marks: [
-    ip.areaY(web, ip.map({ y1: ip.window({ k: 14, reduce: "min" }), y2: ip.window({ k: 14, reduce: "max" }) }, { x: "date", y1: "value", y2: "value", fill: "#4269d0", fillOpacity: 0.15 })),
+    ip.areaY(web, ip.map({ y1: ip.window({ k: 14, reduce: "min" }), y2: ip.window({ k: 14, reduce: "max" }) }, { x: "date", y1: "value", y2: "value", fillOpacity: 0.18 })),
     ip.lineY(web, { x: "date", y: "value" }),
   ],
 })`,
     make: (theme) =>
       ip.plot({
         marks: [
-          ip.areaY(web, ip.map({ y1: ip.window({ k: 14, reduce: "min" }), y2: ip.window({ k: 14, reduce: "max" }) }, { x: "date", y1: "value", y2: "value", fill: "#4269d0", fillOpacity: 0.15, name: "14d envelope" })),
-          ip.lineY(web, { x: "date", y: "value", stroke: "#4269d0", name: "value" }),
-          ip.lineY(web, ip.windowY({ k: 14, reduce: "median" }, { x: "date", y: "value", stroke: "#e4572e", name: "14d median" })),
+          ip.areaY(web, ip.map({ y1: ip.window({ k: 14, reduce: "min" }), y2: ip.window({ k: 14, reduce: "max" }) }, { x: "date", y1: "value", y2: "value", fill: T(theme).categorical[0], fillOpacity: 0.18, name: "14d envelope" })),
+          ip.lineY(web, { x: "date", y: "value", stroke: T(theme).categorical[0], name: "value" }),
+          ip.lineY(web, ip.windowY({ k: 14, reduce: "median" }, { x: "date", y: "value", stroke: T(theme).categorical[7], name: "14d median" })),
         ],
         theme,
       }),
@@ -264,8 +258,16 @@ ip.plot({
   },
 ];
 
-let theme: "light" | "dark" = "light";
+let theme: "light" | "dark" = "dark";
 const charts = new Map<string, HTMLElement>();
+
+function highlight(code: string): string {
+  return code
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/("[^"]*")/g, '<span class="s">$1</span>')
+    .replace(/\b(ip\.\w+)/g, '<span class="f">$1</span>')
+    .replace(/\b(const|return|new)\b/g, '<span class="k">$1</span>');
+}
 
 function renderAll() {
   const t0 = performance.now();
@@ -275,26 +277,29 @@ function renderAll() {
     try {
       const chart = ex.make(theme);
       chart.render(el, { renderer: "canvas" });
-      list.innerHTML = chart.insights.map((i) => `<li>${i.summary} <small style="color:var(--muted)">(${i.method}, ${i.backend})</small></li>`).join("");
-      for (const w of chart.warnings) list.innerHTML += `<li style="color:#e4572e">${w}</li>`;
+      list.innerHTML = chart.insights.map((i) => `<li>${i.summary}<small>${i.method} · ${i.backend}</small></li>`).join("");
+      for (const w of chart.warnings) list.innerHTML += `<li class="warn">${w}</li>`;
     } catch (err) {
-      list.innerHTML = `<li style="color:#e4572e">${(err as Error).message}</li>`;
+      list.innerHTML = `<li class="warn">${(err as Error).message}</li>`;
       console.error(ex.id, err);
     }
   }
-  console.log(`rendered ${examples.length} charts in ${(performance.now() - t0).toFixed(0)}ms (${ip.getBackend().name})`);
+  const ms = performance.now() - t0;
+  document.getElementById("meta")!.innerHTML = `${examples.length} charts · ${ms.toFixed(0)} ms · <code>${ip.getBackend().name}</code> backend`;
+  console.log(`rendered ${examples.length} charts in ${ms.toFixed(0)}ms (${ip.getBackend().name})`);
 }
 
+document.documentElement.dataset.theme = theme;
 const gallery = document.getElementById("gallery")!;
-for (const ex of examples) {
+examples.forEach((ex, i) => {
   const section = document.createElement("section");
   section.className = `example${ex.wide ? " wide" : ""}`;
   section.id = ex.id;
-  section.innerHTML = `<h2>${ex.title}</h2><p>${ex.description}</p><div class="chart"></div><ul class="insights"></ul><details><summary>code</summary><pre></pre></details>`;
-  section.querySelector("pre")!.textContent = ex.code;
+  section.innerHTML = `<header><h2><span class="num">${String(i + 1).padStart(2, "0")}</span>${ex.title}</h2></header><p>${ex.description}</p><div class="chart"></div><ul class="insights"></ul><details><summary>code</summary><pre></pre></details>`;
+  section.querySelector("pre")!.innerHTML = highlight(ex.code);
   gallery.appendChild(section);
   charts.set(ex.id, section.querySelector(".chart") as HTMLElement);
-}
+});
 renderAll();
 
 document.getElementById("theme")!.addEventListener("click", (e) => {
@@ -312,11 +317,13 @@ document.getElementById("wasm")!.addEventListener("click", async (e) => {
   try {
     const { loadWasm } = await import("isopleth/wasm");
     const backend = await ip.init(loadWasm());
-    document.getElementById("backend")!.textContent = `backend: ${backend.name}`;
+    const pill = document.getElementById("backend")!;
+    pill.innerHTML = `<code>backend: ${backend.name}</code>`;
+    if (backend.name === "wasm") pill.classList.add("ok");
     btn.textContent = backend.name === "wasm" ? "wasm loaded" : "wasm unavailable (js)";
     renderAll();
   } catch (err) {
-    btn.textContent = "wasm unavailable (build it with npm run build:wasm)";
+    btn.textContent = "wasm unavailable — npm run build:wasm";
     console.warn(err);
   }
 });

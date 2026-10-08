@@ -61,10 +61,10 @@ const instances = new WeakMap<HTMLElement, { chart: ChartInstance; cleanup: () =
 /** Render a compiled chart into `element`. Re-rendering into the same element reuses the instance. */
 export function renderChart(chart: Chart, element: HTMLElement, opts: RenderOptions = {}): ChartInstance {
   registerECharts();
-  const theme = opts.theme ?? chart.options.theme ?? (chart.theme === "dark" ? "dark" : undefined);
+  // The compiled option carries every colour, so no ECharts theme is needed; `opts.theme` can still name a registered one.
   let entry = instances.get(element);
   if (!entry) {
-    const inst = echarts.init(element, theme as string | undefined, {
+    const inst = echarts.init(element, opts.theme as string | undefined, {
       renderer: opts.renderer ?? "canvas",
       width: opts.width ?? chart.options.width,
       height: opts.height ?? chart.options.height,
@@ -100,7 +100,7 @@ export function disposeChart(element: HTMLElement): void {
 /** Server-side / test rendering to an SVG string (no DOM needed). */
 export function renderSVG(chart: Chart, opts: { width?: number; height?: number } = {}): string {
   registerECharts();
-  const inst = echarts.init(null, chart.theme === "dark" ? "dark" : undefined, {
+  const inst = echarts.init(null, undefined, {
     renderer: "svg",
     ssr: true,
     width: opts.width ?? chart.options.width ?? 640,

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>isopleth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0a0e1f;
+        --surface: #10152b;
+        --border: #222a48;
+        --fg: #f1f3fa;
+        --fg-2: #a9b2c9;
+        --fg-3: #6f7891;
+        --blue: #4a7df0;
+        --violet: #a86bfd;
+        --cyan: #0da2c6;
+        --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --mono: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.4 var(--sans); -webkit-font-smoothing: antialiased; }
+      .hero {
+        position: relative; width: 1200px; height: 630px; overflow: hidden;
+        background:
+          radial-gradient(700px 420px at 86% 18%, rgba(168, 107, 253, 0.28), transparent 62%),
+          radial-gradient(760px 520px at 8% 92%, rgba(74, 125, 240, 0.26), transparent 60%),
+          radial-gradient(500px 300px at 60% 110%, rgba(13, 162, 198, 0.18), transparent 60%),
+          var(--bg);
+      }
+      .hero::before {
+        content: ""; position: absolute; inset: 0;
+        background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1.2px);
+        background-size: 22px 22px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.25));
+        pointer-events: none;
+      }
+      .copy { position: absolute; left: 56px; top: 44px; width: 440px; z-index: 2; }
+      .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+      .brand .mark { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--blue), var(--violet)); box-shadow: 0 8px 30px rgba(74, 125, 240, 0.45); position: relative; }
+      .brand .mark::after { content: ""; position: absolute; left: 7px; right: 7px; top: 16px; height: 2px; background: #fff; border-radius: 2px; box-shadow: 0 -5px 0 rgba(255,255,255,0.55), 0 5px 0 rgba(255,255,255,0.55); }
+      .brand b { font-size: 30px; letter-spacing: -0.035em; font-weight: 800; }
+      h1 { font-size: 40px; line-height: 1.06; letter-spacing: -0.035em; margin: 0 0 14px; font-weight: 800; }
+      h1 em { font-style: normal; background: linear-gradient(90deg, #7fa3ff, var(--violet) 60%, #ff7a9e); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      p.lead { margin: 0 0 16px; font-size: 14.5px; color: var(--fg-2); line-height: 1.45; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chip { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(16, 21, 43, 0.7); color: var(--fg-2); }
+      .chip i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+      .install { margin-top: 18px; font: 12.5px var(--mono); color: var(--fg-2); background: rgba(16, 21, 43, 0.85); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; display: inline-block; }
+      .install span { color: var(--fg-3); }
+      .card {
+        position: absolute; background: rgba(16, 21, 43, 0.86); border: 1px solid var(--border); border-radius: 16px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+        backdrop-filter: blur(8px);
+        overflow: hidden;
+      }
+      .card.main { left: 528px; top: 48px; width: 640px; height: 380px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 60px rgba(74, 125, 240, 0.12); }
+      .card.main .chart { position: absolute; inset: 6px 8px 4px 2px; }
+      .card.small { top: 448px; width: 356px; height: 150px; }
+      .card.small .chart { position: absolute; inset: 4px; }
+      .card.small.a { left: 56px; }
+      .card.small.b { left: 428px; }
+      .card.small.c { left: 800px; width: 344px; }
+      .card .tag { position: absolute; top: 10px; right: 12px; font-size: 10.5px; color: var(--fg-3); font-family: var(--mono); letter-spacing: 0.02em; z-index: 2; }
+      .card.main .tag { top: 12px; right: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="hero" id="hero">
+      <div class="copy">
+        <div class="brand"><div class="mark"></div><b>isopleth</b></div>
+        <h1>Composable charts.<br /><em>Insights built in.</em></h1>
+        <p class="lead">Observable Plot's grammar on Apache ECharts 6 — binning, stacking, windows and facets that compose. Anomalies, forecasts, changepoints and outliers are one option away, computed by a Rust core in WebAssembly.</p>
+        <div class="chips">
+          <span class="chip"><i style="background: var(--blue)"></i>marks + transforms</span>
+          <span class="chip"><i style="background: var(--violet)"></i>insights as marks</span>
+          <span class="chip"><i style="background: var(--cyan)"></i>Rust · WASM · TypeScript</span>
+        </div>
+        <div class="install"><span>$</span> npm install isopleth echarts</div>
+      </div>
+      <div class="card main"><span class="tag">auto · anomalies · forecast · changepoints · trend</span><div class="chart" id="c-main"></div></div>
+      <div class="card small a"><span class="tag">stackY · windowY · gradient</span><div class="chart" id="c-a"></div></div>
+      <div class="card small b"><span class="tag">cell · group</span><div class="chart" id="c-b"></div></div>
+      <div class="card small c"><span class="tag">seriesOutliers</span><div class="chart" id="c-c"></div></div>
+    </div>
+    <script type="module" src="/src/hero.ts"></script>
+  </body>
+</html>
