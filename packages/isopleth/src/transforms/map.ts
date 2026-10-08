@@ -5,7 +5,7 @@
  */
 
 import type { ChannelValue, MarkOptions, Reducer, Row, Transform, Value, WindowReducer, Interval } from "../types.js";
-import { toNumber, valueof } from "../channel.js";
+import { carryLabel, toNumber, valueof } from "../channel.js";
 import { getBackend } from "../backend/index.js";
 import { maybeInterval } from "../interval.js";
 import { basic, column, seriesOf } from "./basic.js";
@@ -36,8 +36,9 @@ const CHANNELS = { x: ["x", "x1", "x2"], y: ["y", "y1", "y2"] } as const;
 function mapn<D extends object>(axis: "x" | "y", fn: MapFn, options: MarkOptions<D>, extraChannels: string[] = []): MarkOptions<D> {
   const names = [...CHANNELS[axis], ...extraChannels].filter((c) => (options as Record<string, unknown>)[c] !== undefined);
   if (names.length === 0) return options;
-  const cols = names.map((c) => [c, column(c)] as const);
   const inputs = Object.fromEntries(names.map((c) => [c, (options as Record<string, unknown>)[c] as ChannelValue<D>]));
+  const prevLabels = ((options as Record<string, unknown>).__labels ?? {}) as Record<string, string | undefined>;
+  const cols = names.map((c) => [c, column(carryLabel(inputs[c], prevLabels[c], c))] as const);
   const transform: Transform<D> = (data, facets) => {
     const outputs: Record<string, Float64Array> = {};
     for (const c of names) {

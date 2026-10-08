@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>isopleth playground</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <style>
+      main.playground { max-width: 1400px; margin: 0 auto; padding: 22px 28px 48px; display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+      .stage { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+      .stage .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); }
+      .stage .chart { height: 480px; }
+      .stage .bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+      .stage .bar select { font: inherit; font-size: 12.5px; color: var(--fg); background: var(--bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 5px 8px; }
+      .stage .bar label { color: var(--fg-3); font-size: 12px; }
+      .stage .bar input[type=file] { display: none; }
+      .stage .bar .spacer { flex: 1; }
+      pre.code { margin: 0; max-height: 220px; }
+      .copy { font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 7px; border: 1px solid var(--card-border); background: var(--bg); color: var(--fg-2); cursor: pointer; }
+      .copy:hover { color: var(--fg); }
+      #panel { position: sticky; top: 72px; }
+      @media (max-width: 900px) { main.playground { grid-template-columns: 1fr; } #panel { position: static; } }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="wordmark"><b>isopleth</b><span>playground · compose a chart, read the code</span></div>
+      <nav class="links"><a href="/">gallery</a><a class="active" href="/playground.html">playground</a><a href="https://github.com/DanielMcSheehy/isopleth">github</a></nav>
+      <div class="spacer"></div>
+      <button class="ghost" id="theme">light mode</button>
+    </header>
+    <main class="playground">
+      <aside id="panel"></aside>
+      <div class="stage">
+        <div class="card">
+          <div class="bar">
+            <label>dataset</label>
+            <select id="dataset">
+              <option value="timeseries">daily traffic (3 series, 240 days)</option>
+              <option value="single">daily traffic (1 series)</option>
+              <option value="penguins">penguins</option>
+              <option value="sales">sales (regions × products × months)</option>
+              <option value="fleet">fleet cpu (12 hosts)</option>
+              <option value="statuses">http statuses</option>
+            </select>
+            <label class="copy" for="csv">load CSV…</label><input type="file" id="csv" accept=".csv,text/csv" />
+            <div class="spacer"></div>
+            <span class="pill" id="stats"></span>
+          </div>
+          <div class="chart" id="chart"></div>
+          <ul class="insights" id="insights"></ul>
+        </div>
+        <div class="card">
+          <div class="bar"><label>code</label><div class="spacer"></div><button class="copy" id="copy">copy</button></div>
+          <pre class="code" id="code"></pre>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/playground.ts"></script>
+  </body>
+</html>

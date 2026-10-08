@@ -72,6 +72,13 @@ export function labelof(value: unknown, fallback?: string): string | undefined {
   return fallback;
 }
 
+/** A human label for a channel: its field name unless that is an internal or generic channel name, else `prev`. */
+export function carryLabel(value: unknown, prev: string | undefined, channel: string): string | undefined {
+  const l = labelof(value);
+  if (l && !l.startsWith("__") && l !== channel && !/^(x|y|x1|x2|y1|y2|z|fill|stroke)$/.test(l)) return l;
+  return prev;
+}
+
 /** Infer the scale type from the first non-missing value. */
 export function inferType(values: readonly Value[] | undefined): ScaleType | undefined {
   if (!values) return undefined;

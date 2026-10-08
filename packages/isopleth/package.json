@@ -31,6 +31,10 @@
     "./wasm": {
       "types": "./dist/backend/wasm.d.ts",
       "import": "./dist/backend/wasm.js"
+    },
+    "./editor": {
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.js"
     }
   },
   "files": [

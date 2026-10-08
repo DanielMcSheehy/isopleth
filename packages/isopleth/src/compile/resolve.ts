@@ -147,6 +147,8 @@ export function resolveMark(mark: Mark, plan: FacetPlan, options: PlotOptions): 
     const label = labelof(v);
     if (label && !label.startsWith("__") && label !== name) labels[name] = label;
   }
+  const carried = (opts as Record<string, unknown>).__labels as Record<string, string | undefined> | undefined;
+  if (carried) for (const [k, l] of Object.entries(carried)) if (l && labels[k as ChannelName] === undefined && channels[k as ChannelName]) labels[k as ChannelName] = l;
   // Derived labels for transformed channels (bins/groups keep the input name).
   const extra: Record<string, Value[]> = {};
   if (opts.channels) for (const [k, ch] of Object.entries(opts.channels)) extra[k] = valueof(data, ch) ?? [];

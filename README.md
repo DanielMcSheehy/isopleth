@@ -1,10 +1,10 @@
+<p align="center">
+  <img src="docs/img/hero.png" alt="isopleth — composable charts, insights built in" width="100%">
+</p>
+
 # isopleth
 
 Composable charts on **Apache ECharts 6**, with the grammar of [Observable Plot](https://observablehq.com/plot/) and **insights built in** — anomalies, forecasts, changepoints, seasonality, trends and outliers — computed by a **Rust core** (compiled to WebAssembly, built on [augurs](https://github.com/grafana/augurs)) with a pure-TypeScript fallback that works everywhere.
-
-<p align="center">
-  <img src="docs/img/auto-insights.png" alt="auto mark with anomalies, forecast, changepoint, seasonality and trend insights" width="100%">
-</p>
 
 ```ts
 import * as ip from "isopleth";
@@ -12,18 +12,45 @@ import * as ip from "isopleth";
 ip.plot({
   marks: [ip.auto(data, { x: "date", y: "value" })],
   insights: { anomalies: true, forecast: { horizon: 30 }, changepoints: true, seasonality: true, trend: true },
-  x: { zoom: true },
+  theme: "dark",
 }).render(document.querySelector("#chart"));
 ```
 
-One `auto` mark, one `insights` object: the chart above is the result. The red dot is a point anomaly against the shaded expected band; the orange rule and step lines mark a changepoint and the segment means; the dashed purple line and band are a 30-step forecast with its 95% interval; the grey dashes are the trend. Every finding is also returned as data with a one-line summary (the subtitle).
+<p align="center">
+  <img src="docs/img/auto-insights.png" alt="auto mark with anomalies, forecast, changepoint, seasonality and trend insights" width="100%">
+</p>
+
+One `auto` mark, one `insights` object: the chart above is the result. The red dot is a point anomaly against the shaded expected band; the amber rule and step lines mark a changepoint and the segment means; the dashed violet line and band are a 30-step forecast with its 95% interval; the grey dashes are the trend. Every finding is also returned as data with a one-line summary (the subtitle).
 
 A chart is a list of **marks** (`lineY`, `areaY`, `barY`, `rectY`, `dot`, `cell`, `ruleX`, `text`, `differenceY`, …). Each mark is `mark(data, options)` where options are **channels** (`x`, `y`, `fill`, `stroke`, `r`, `fx`, …) bound to fields, accessors or arrays. **Transforms** (`binX`, `groupX`, `stackY`, `windowY`, `mapY`, `normalizeY`, `intervalX`, `imputeY`, `shiftX`, …) are functions over options that nest: inner first. `plot()` compiles everything into a single ECharts `option` you can render, serialize, or merge into your own ECharts setup.
 
 
+## Playground & editor
+
+<p align="center">
+  <img src="docs/img/playground.gif" alt="the editor: toggling insights, stacking, faceting, dodging bars, finding an outlying series, switching themes" width="100%">
+</p>
+
+`isopleth/editor` is an optional, dependency-free panel that edits a **chart spec** — mark type, x/y/aggregate, colour by, size by, facet by, stacking, smoothing, time interval, curve, insights, per-series colours and theme — and re-renders on every change. The same spec round-trips to code with `specToCode()`, so the playground doubles as a snippet generator.
+
+```ts
+import { createEditor, specToCode } from "isopleth/editor";
+
+const editor = createEditor(document.querySelector("#panel"), {
+  data,
+  target: document.querySelector("#chart"),
+  spec: { mark: "auto", x: "date", y: "value", color: "series", insights: { anomalies: true } },
+  onChange: (spec, chart) => console.log(specToCode(spec), chart.insights),
+});
+editor.setSpec({ mark: "area", stack: "normalize" });
+editor.setData(otherRows);
+```
+
+The spec is plain JSON (`ChartSpec`) and works without the UI: `ip.plot(ip.fromSpec(data, spec))`. Run the playground with `npm run dev` → `/playground.html`; it ships with sample datasets and a CSV loader.
+
 ## Gallery
 
-All of these are in the demo (`npm run dev`); each is a handful of lines.
+All of these are in the demo (`npm run dev`), in the `dark` theme; each is a handful of lines.
 
 <table>
   <tr>
@@ -51,9 +78,6 @@ All of these are in the demo (`npm run dev`); each is a handful of lines.
   </tr>
   <tr>
     <td colspan="2"><img src="docs/img/facets.png" alt="facets with per-facet anomaly detection"><br><sub><b>facets</b> — <code>lineY(data, { x, y, stroke: "series", fx: "series" })</code>; the anomaly insight runs per facet</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2"><img src="docs/img/auto-insights-dark.png" alt="dark theme"><br><sub><b>dark theme</b> — <code>theme: "dark"</code> (any ECharts theme name or object)</sub></td>
   </tr>
 </table>
 
@@ -151,7 +175,7 @@ ip.plot({
 
 Every insight accepts `target: "markId"`, `show: false` (compute without drawing) and `color`. Mark-level `insights` override plot-level ones. `chart.insights` holds `{kind, mark, series, summary, method, backend, data}`; `annotate: false` keeps the summaries out of the subtitle.
 
-## Scales, facets, themes
+## Scales and facets
 
 ```ts
 ip.plot({
@@ -160,7 +184,7 @@ ip.plot({
   y: { grid: true, zero: true, percent: false, type: "log", breaks: [{ start: 100, end: 900 }] },
   color: { scheme: "tableau10", legend: true },               // or range: [...], type: "diverging", domain
   facet: { sharedY: false, gap: 6 },
-  theme: "dark",                                              // ECharts theme name or object
+  theme: "dark",                                              // "light" | "dark" | "ink" | a registered name | a Theme object
   title: "Latency", subtitle: "p95 per region", caption: "Source: …",
   tooltip: "axis", legend: true, animation: false,
   echarts: { toolbox: { feature: { saveAsImage: {} } } },     // merged last
@@ -168,6 +192,41 @@ ip.plot({
 ```
 
 Scale types are inferred from the data (strings/booleans → category axis, dates → time axis, numbers → value axis). `chart.option` is a plain ECharts option: `chart.render(el)` uses a tree-shaken `echarts/core` with only the needed modules; `chart.toSVG()` renders server-side with ECharts' SSR mode (used by the test suite — no DOM required).
+
+## Theming
+
+A theme is a small set of design tokens, and the compiler reads nothing else for styling — so a chart is restyled completely by swapping it:
+
+| token | what it drives |
+| --- | --- |
+| `background`, `surface` | chart surface (also the colour of the gaps between stacked segments and the rings around dots); tooltip/panel surface |
+| `text`, `textSecondary`, `textMuted` | title, axis labels and names, legend, subtitle/insight notes |
+| `grid`, `axis`, `accent` | hairline gridlines, axis lines, zoom-slider and selection chrome |
+| `font`, `fontMono` | every text in the chart |
+| `categorical` | the series palette, assigned in order (never cycled) |
+| `sequential`, `diverging` | continuous colour ramps for `fill`/`stroke` on numeric channels |
+| `insight` | colours for anomalies, forecasts, changepoints, trend, outliers, bands, positive/negative differences |
+| `mark` | line width, area/stack opacity, bar radius and max width, dot radius, gap width |
+
+Three themes are built in — `light` (warm off-white), `dark` (cool palette on deep navy) and `ink` (high-contrast print). Both palettes were run through a CVD/contrast validator against their surfaces. Derive your own with `defineTheme`:
+
+```ts
+ip.defineTheme("brand", "dark", {
+  background: "#0b0f1a",
+  categorical: ["#5b8def", "#3ddbd9", "#f5b545", "#ff6fae", "#a78bfa", "#9ccc65"],
+  font: "Inter, system-ui, sans-serif",
+  insight: { anomaly: "#ff4d6d" },
+  mark: { lineWidth: 1.5, barRadius: 6 },
+});
+ip.plot({ theme: "brand", ... });                 // by name
+ip.plot({ theme: { mode: "dark", grid: "#222" } }); // a partial over the built-in of that mode
+```
+
+`themeToCSSVars(theme)` gives the same tokens as CSS custom properties (`--ip-bg`, `--ip-text`, `--ip-c1`…) for the page around the chart; the editor uses them. The chart background is transparent by default so it sits on your own surface — pass `background` to paint it.
+
+<p align="center">
+  <img src="docs/img/auto-insights-light.png" alt="the same chart in the light theme" width="100%">
+</p>
 
 ## Backends
 
@@ -198,7 +257,8 @@ crates/isopleth-core    Rust kernels (bin, group, window, map, impute, insights/
 crates/isopleth-wasm    wasm-bindgen bindings → @isopleth/wasm                         npm run build:wasm
 packages/isopleth       the TypeScript library                                        npm test · npm run build
 packages/wasm           npm package wrapping the wasm-pack output
-packages/demo           Vite gallery (14 examples, light/dark, wasm toggle)           npm run dev
+packages/demo           Vite gallery, playground (editor) and hero page                npm run dev
+scripts/shots.mjs       regenerates docs/img (screenshots, hero, GIF) with Playwright
 ```
 
 ```sh

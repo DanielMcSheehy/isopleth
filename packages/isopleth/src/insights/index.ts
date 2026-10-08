@@ -195,7 +195,7 @@ function runAnomalies(rm: ResolvedMark, s: SeriesData, c: Cfg<AnomalyInsight>, o
   if (c.show === false) return;
   if (c.band !== false) {
     const band = s.index.map((_, j) => ff({ x: xValue(s.x[j], s.temporal), lower: r.lower[j], upper: r.upper[j] }));
-    out.marks.push(createMark("areaY", band, { ...fo, x: "x", y1: "lower", y2: "upper", fill: IC.band, fillOpacity: 0.1, silent: true, legend: false, id: `${rm.mark.id}:anomaly-band:${s.key ?? ""}`, z2: -1 }, true));
+    out.marks.push(createMark("areaY", band, { ...fo, x: "x", y1: "lower", y2: "upper", fill: IC.band, fillOpacity: 0.07, silent: true, legend: false, id: `${rm.mark.id}:anomaly-band:${s.key ?? ""}`, z2: -1 }, true));
   }
   if (points.length) {
     out.marks.push(

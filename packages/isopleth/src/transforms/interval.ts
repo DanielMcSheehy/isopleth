@@ -11,7 +11,7 @@
  */
 
 import type { ChannelValue, Interval, MarkOptions, Reducer, Row, Transform, Value } from "../types.js";
-import { inferType, toNumber, valueof } from "../channel.js";
+import { carryLabel, inferType, toNumber, valueof } from "../channel.js";
 import { getBackend } from "../backend/index.js";
 import { maybeInterval } from "../interval.js";
 import { basic, seriesOf } from "./basic.js";
@@ -93,6 +93,8 @@ function intervaln<D extends object>(axis: "x" | "y", opts: IntervalTransformOpt
   delete out.interval;
   (out as Record<string, unknown>)[axis] = "__interval";
   if (valIn !== undefined) (out as Record<string, unknown>)[other] = "__value";
+  const prev = ((options as Record<string, unknown>).__labels ?? {}) as Record<string, string | undefined>;
+  (out as Record<string, unknown>).__labels = { ...prev, [axis]: carryLabel(posIn, prev[axis], axis), ...(valIn !== undefined ? { [other]: carryLabel(valIn, prev[other], other) } : {}) };
   return basic(out, transform);
 }
 

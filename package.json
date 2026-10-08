@@ -2,7 +2,9 @@
   "name": "isopleth-monorepo",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build -w isopleth",
     "build:wasm": "wasm-pack build crates/isopleth-wasm --target web --release --out-dir ../../packages/wasm/pkg --out-name isopleth_wasm && node scripts/fix-wasm-pkg.mjs",
@@ -12,6 +14,7 @@
     "lint": "cargo clippy --workspace --all-targets -- -D warnings && npm run lint -w isopleth"
   },
   "devDependencies": {
+    "playwright": "^1.64.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

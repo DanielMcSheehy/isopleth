@@ -11,7 +11,7 @@
  */
 
 import type { ChannelValue, Interval, MarkOptions, Reducer, Row, Transform, Value } from "../types.js";
-import { ascending, encode, inferType, isMissing, toNumber, toNumbers, valueof } from "../channel.js";
+import { ascending, carryLabel, encode, inferType, isMissing, toNumber, toNumbers, valueof } from "../channel.js";
 import { getBackend } from "../backend/index.js";
 import { guessTimeInterval, maybeInterval } from "../interval.js";
 import { basic, isDataChannel } from "./basic.js";
@@ -364,6 +364,16 @@ function groupn<D extends object>(mode: { x?: "group" | "bin"; y?: "group" | "bi
   if (fx !== undefined) out.fx = "fx";
   if (fy !== undefined) out.fy = "fy";
   (out as Record<string, unknown>).__grouped = { x: mode.x, y: mode.y };
+  const prev = ((options as Record<string, unknown>).__labels ?? {}) as Record<string, string | undefined>;
+  const labels: Record<string, string | undefined> = { ...prev };
+  if (xs.value !== undefined) labels.x = carryLabel(xs.value, prev.x, "x");
+  if (ys.value !== undefined) labels.y = carryLabel(ys.value, prev.y, "y");
+  for (const [name, reducer] of outputEntries) {
+    const input = reducerInputs[name];
+    const base = input !== undefined ? carryLabel(input, prev[name], name) : undefined;
+    labels[name] = typeof reducer === "string" ? (base ? `${reducer} of ${base}` : reducer === "count" ? "count" : reducer) : base;
+  }
+  (out as Record<string, unknown>).__labels = labels;
   return basic(out, transform);
 }
 

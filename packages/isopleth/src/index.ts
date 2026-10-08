@@ -29,6 +29,8 @@ export {
 } from "./marks.js";
 export type { DifferenceOptions } from "./marks.js";
 export { auto, autoSpec } from "./auto.js";
+export { fromSpec, specMarks, specToCode, inspectFields } from "./spec.js";
+export type { ChartSpec, SpecMark, FieldInfo } from "./spec.js";
 export type { AutoOptions, AutoSpec, AutoChannel } from "./auto.js";
 
 // Transforms

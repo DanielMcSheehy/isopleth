@@ -6,7 +6,7 @@
  */
 
 import type { ChannelValue, MarkOptions, Row, Transform, Value } from "../types.js";
-import { isMissing, keyof, toNumber, valueof } from "../channel.js";
+import { carryLabel, isMissing, keyof, toNumber, valueof } from "../channel.js";
 import { basic, column, isDataChannel } from "./basic.js";
 
 export type StackOffset = null | undefined | "normalize" | "center" | "wiggle" | ((groups: number[][], Y1: Float64Array, Y2: Float64Array, Z: Value[]) => void);
@@ -101,6 +101,8 @@ function stackn<D extends object>(axis: "x" | "y", stackOpts: StackOptions, opti
     out.x = vm as ChannelValue<D>;
   }
   (out as Record<string, unknown>).__stacked = { axis, offset: offset ?? null, order: order ?? null };
+  const prev = ((options as Record<string, unknown>).__labels ?? {}) as Record<string, string | undefined>;
+  (out as Record<string, unknown>).__labels = { ...prev, [axis]: carryLabel(value, prev[axis], axis) };
   return basic(out, transform);
 }
 
