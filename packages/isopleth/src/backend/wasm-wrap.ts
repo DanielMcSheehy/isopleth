@@ -1,4 +1,4 @@
-/** Wraps an initialised `@isopleth/wasm` module as a `Backend` (no dependency on the package itself). */
+/** Wraps an initialised `isopleth-wasm` module as a `Backend` (no dependency on the package itself). */
 
 import type { Backend } from "./types.js";
 import { BackendError } from "./types.js";
@@ -6,7 +6,7 @@ import { BackendError } from "./types.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type WasmModule = Record<string, any> & { default?: (input?: unknown) => Promise<unknown>; initSync?: (opts: unknown) => unknown };
 
-/** Wrap an initialised `@isopleth/wasm` module as a `Backend`. */
+/** Wrap an initialised `isopleth-wasm` module as a `Backend`. */
 export function wrapWasm(w: WasmModule): Backend {
   const call = <T>(fn: string, ...args: unknown[]): T => {
     try {

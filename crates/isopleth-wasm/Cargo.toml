@@ -1,6 +1,6 @@
 [package]
 name = "isopleth-wasm"
-description = "wasm-bindgen bindings for isopleth-core, published to npm as @isopleth/wasm."
+description = "wasm-bindgen bindings for isopleth-core, published to npm as isopleth-wasm."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

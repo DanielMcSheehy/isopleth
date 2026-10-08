@@ -85,7 +85,7 @@ All of these are in the demo (`npm run dev`), in the `dark` theme; each is a han
 
 ```sh
 npm install isopleth echarts            # peer dependency: echarts >= 6
-npm install @isopleth/wasm              # optional: the Rust/WASM backend
+npm install isopleth-wasm              # optional: the Rust/WASM backend
 ```
 
 ```ts
@@ -230,7 +230,7 @@ ip.plot({ theme: { mode: "dark", grid: "#222" } }); // a partial over the built-
 
 ## Backends
 
-| | `js` (default) | `wasm` (`@isopleth/wasm`) |
+| | `js` (default) | `wasm` (`isopleth-wasm`) |
 | --- | --- | --- |
 | binning, grouping, windows, maps, imputation | ✓ | ✓ |
 | anomalies (mad, zscore, iqr, seasonal, ewma) | ✓ | ✓ |
@@ -254,7 +254,7 @@ CI builds the package on every push and publishes it to the [`wasm-pkg`](https:/
 
 ```
 crates/isopleth-core    Rust kernels (bin, group, window, map, impute, insights/*)   cargo test
-crates/isopleth-wasm    wasm-bindgen bindings → @isopleth/wasm                         npm run build:wasm
+crates/isopleth-wasm    wasm-bindgen bindings → isopleth-wasm                         npm run build:wasm
 packages/isopleth       the TypeScript library                                        npm test · npm run build
 packages/wasm           npm package wrapping the wasm-pack output
 packages/demo           Vite gallery, playground (editor) and hero page                npm run dev
@@ -275,6 +275,10 @@ npm run dev                                        # http://localhost:5173
 3. **Insights** run on the resolved series and append generated marks + per-item highlights.
 4. **Scales** are inferred across all marks (x, y, color, r) including the generated ones, so forecasts extend the axis.
 5. **Compile**: each mark × facet × series becomes ECharts series (`line`, `bar`, `scatter`, `heatmap`, `custom` for rects/bands/segments), with native stacking for zero-based stacks and exact polygons for arbitrary bands; axes, grids, legend, tooltip, visualMap and dataZoom are assembled around them.
+
+### Releasing
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`: it rebuilds the wasm, runs both test suites, and publishes `isopleth-wasm` and `isopleth` to npm with provenance. Bump both `package.json` versions to the tag first. Authentication is npm trusted publishing (configure this repo + `release.yml` as a trusted publisher for each package on npmjs.com) or an `NPM_TOKEN` repository secret.
 
 ### Status
 

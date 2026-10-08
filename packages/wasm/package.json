@@ -1,5 +1,5 @@
 {
-  "name": "@isopleth/wasm",
+  "name": "isopleth-wasm",
   "version": "0.1.0",
   "description": "WebAssembly build of isopleth-core (wasm-bindgen output). Load it with `isopleth/wasm`.",
   "type": "module",
@@ -13,6 +13,23 @@
     },
     "./isopleth_wasm_bg.wasm": "./pkg/isopleth_wasm_bg.wasm"
   },
-  "files": ["pkg"],
-  "sideEffects": false
+  "files": [
+    "pkg"
+  ],
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DanielMcSheehy/isopleth.git",
+    "directory": "packages/wasm"
+  },
+  "keywords": [
+    "isopleth",
+    "wasm",
+    "echarts",
+    "forecasting",
+    "anomaly-detection"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -13,6 +13,6 @@ export default defineConfig({
       { find: /^isopleth$/, replacement: src("index.ts") },
     ],
   },
-  optimizeDeps: { exclude: ["@isopleth/wasm", "isopleth"] },
+  optimizeDeps: { exclude: ["isopleth-wasm", "isopleth"] },
   build: { target: "es2022", rollupOptions: { input: { main: "index.html", playground: "playground.html", hero: "hero.html" } } },
 });

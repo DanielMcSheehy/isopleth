@@ -46,18 +46,22 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "echarts": "^6.0.0"
   },
   "optionalDependencies": {
-    "@isopleth/wasm": "*"
+    "isopleth-wasm": "*"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
     "echarts": "^6.1.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

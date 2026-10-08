@@ -1,0 +1,57 @@
+name: Release
+
+# Publishes `isopleth` and `isopleth-wasm` to npm when a version tag is pushed:
+#   npm version minor -w isopleth            # bumps packages/isopleth/package.json
+#   git tag v0.2.0 && git push --tags
+# Both packages must carry the tag's version. Authentication is npm "trusted
+# publishing" (OIDC, no secret) — configure it once on npmjs.com for each
+# package (Settings → Publishing access → Trusted publisher: this repo +
+# workflow file `release.yml`). An `NPM_TOKEN` repository secret works too.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest   # trusted publishing needs npm >= 11.5
+      - run: npm ci
+      - name: Check that the tag matches the package versions
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for p in packages/isopleth/package.json packages/wasm/package.json; do
+            V=$(node -p "require('./$p').version")
+            [ "$V" = "$TAG" ] || { echo "$p is $V but tag is $TAG"; exit 1; }
+          done
+      - run: cargo test --workspace
+      - name: Build wasm
+        run: |
+          curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
+          npm run build:wasm
+      - run: npm run typecheck -w isopleth && npm test -w isopleth && ISOPLETH_BACKEND=wasm npm test -w isopleth
+      - run: npm run build -w isopleth
+      - name: Publish isopleth-wasm
+        run: npm publish --provenance --access public -w isopleth-wasm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish isopleth
+        run: npm publish --provenance --access public -w isopleth
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
