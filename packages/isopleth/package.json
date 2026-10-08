@@ -9,7 +9,17 @@
     "url": "https://github.com/DanielMcSheehy/isopleth.git",
     "directory": "packages/isopleth"
   },
-  "keywords": ["echarts", "charts", "visualization", "grammar-of-graphics", "observable-plot", "anomaly-detection", "forecasting", "wasm", "rust"],
+  "keywords": [
+    "echarts",
+    "charts",
+    "visualization",
+    "grammar-of-graphics",
+    "observable-plot",
+    "anomaly-detection",
+    "forecasting",
+    "wasm",
+    "rust"
+  ],
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -23,7 +33,10 @@
       "import": "./dist/backend/wasm.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -38,6 +51,7 @@
     "@isopleth/wasm": "*"
   },
   "devDependencies": {
+    "@types/node": "^26.6.4",
     "echarts": "^6.1.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
