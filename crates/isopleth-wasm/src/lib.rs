@@ -244,6 +244,7 @@ pub fn forecast(y: &[f64], opts: JsValue) -> Result<JsValue, JsError> {
 #[serde(rename_all = "camelCase", default)]
 pub struct ChangepointOpts {
     method: Option<String>,
+    model: Option<String>,
     min_segment: Option<usize>,
     max_changepoints: Option<usize>,
     penalty: Option<f64>,
@@ -258,10 +259,16 @@ pub fn changepoints(y: &[f64], opts: JsValue) -> Result<JsValue, JsError> {
         Some(m) => core::ChangepointMethod::parse(m)
             .ok_or_else(|| JsError::new(&format!("unknown changepoint method: {m}")))?,
     };
+    let model = match o.model.as_deref() {
+        None => d.model,
+        Some(m) => core::changepoint::CostModel::parse(m)
+            .ok_or_else(|| JsError::new(&format!("unknown changepoint model: {m}")))?,
+    };
     let r = core::changepoint::detect(
         y,
         core::ChangepointOptions {
             method,
+            model,
             min_segment: o.min_segment.unwrap_or(d.min_segment),
             max_changepoints: o.max_changepoints.unwrap_or(d.max_changepoints),
             penalty: o.penalty.unwrap_or(d.penalty),

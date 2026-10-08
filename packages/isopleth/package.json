@@ -1,0 +1,45 @@
+{
+  "name": "isopleth",
+  "version": "0.1.0",
+  "description": "Composable, Observable-Plot-style chart grammar on top of Apache ECharts 6, with built-in insights (anomalies, forecasts, changepoints, outliers) backed by a Rust/WASM core.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DanielMcSheehy/isopleth.git",
+    "directory": "packages/isopleth"
+  },
+  "keywords": ["echarts", "charts", "visualization", "grammar-of-graphics", "observable-plot", "anomaly-detection", "forecasting", "wasm", "rust"],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./wasm": {
+      "types": "./dist/backend/wasm.d.ts",
+      "import": "./dist/backend/wasm.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "echarts": "^6.0.0"
+  },
+  "optionalDependencies": {
+    "@isopleth/wasm": "*"
+  },
+  "devDependencies": {
+    "echarts": "^6.1.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

@@ -30,9 +30,29 @@ impl ChangepointMethod {
     }
 }
 
+/// Cost model for binary segmentation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CostModel {
+    /// Piecewise-constant mean (classic; trends get chopped into steps).
+    Mean,
+    /// Piecewise-linear (default): a level shift on top of a trend is one changepoint.
+    Linear,
+}
+
+impl CostModel {
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "mean" => Some(CostModel::Mean),
+            "linear" => Some(CostModel::Linear),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ChangepointOptions {
     pub method: ChangepointMethod,
+    pub model: CostModel,
     /// Minimum segment length (binary segmentation).
     pub min_segment: usize,
     /// Upper bound on the number of changepoints (binary segmentation).
@@ -45,6 +65,7 @@ impl Default for ChangepointOptions {
     fn default() -> Self {
         ChangepointOptions {
             method: ChangepointMethod::Auto,
+            model: CostModel::Linear,
             min_segment: 5,
             max_changepoints: 10,
             penalty: 1.0,
@@ -128,32 +149,51 @@ fn segment_means(y: &[f64], cps: &[usize]) -> Vec<f64> {
     out
 }
 
-/// Greedy binary segmentation. Each split must reduce the within-segment sum of
-/// squares by more than `penalty · σ² · log(n)`, with σ estimated robustly from
-/// first differences so that the level shifts themselves don't inflate it.
+/// Greedy binary segmentation. Each split must reduce the within-segment
+/// residual sum of squares by more than a BIC-style penalty (`3·σ²·ln(n)` per
+/// parameter, scaled by `penalty`), with σ estimated robustly from first
+/// differences so that the level shifts themselves don't inflate it.
 pub fn binary_segmentation(y: &[f64], opts: ChangepointOptions) -> Vec<usize> {
     let n = y.len();
-    let min_seg = opts.min_segment.max(1);
+    let linear = opts.model == CostModel::Linear;
+    let min_seg = opts.min_segment.max(if linear { 3 } else { 1 });
     if n < 2 * min_seg {
         return vec![];
     }
     let diffs: Vec<f64> = y.windows(2).map(|w| w[1] - w[0]).collect();
     let sigma = (stats::mad(&diffs) * stats::MAD_TO_SIGMA / std::f64::consts::SQRT_2).max(1e-12);
-    // BIC-style penalty: 3·σ²·ln(n) per extra changepoint (conservative, like
-    // ruptures' default) scaled by the user's `penalty`.
-    let pen = opts.penalty.max(0.0) * 3.0 * sigma * sigma * (n as f64).ln();
+    let params = if linear { 2.0 } else { 1.0 };
+    let pen = opts.penalty.max(0.0) * 3.0 * params * sigma * sigma * (n as f64).ln();
 
-    // Prefix sums for O(1) segment costs.
+    // Prefix sums for O(1) segment costs (x = index).
     let mut ps = vec![0.0; n + 1];
     let mut pss = vec![0.0; n + 1];
+    let mut px = vec![0.0; n + 1];
+    let mut pxx = vec![0.0; n + 1];
+    let mut pxy = vec![0.0; n + 1];
     for i in 0..n {
+        let x = i as f64;
         ps[i + 1] = ps[i] + y[i];
         pss[i + 1] = pss[i] + y[i] * y[i];
+        px[i + 1] = px[i] + x;
+        pxx[i + 1] = pxx[i] + x * x;
+        pxy[i + 1] = pxy[i] + x * y[i];
     }
     let cost = |a: usize, b: usize| -> f64 {
         let len = (b - a) as f64;
-        let s = ps[b] - ps[a];
-        pss[b] - pss[a] - s * s / len
+        let sy = ps[b] - ps[a];
+        let syy = pss[b] - pss[a] - sy * sy / len;
+        if !linear {
+            return syy;
+        }
+        let sx = px[b] - px[a];
+        let sxx = pxx[b] - pxx[a] - sx * sx / len;
+        let sxy = pxy[b] - pxy[a] - sx * sy / len;
+        if sxx <= 0.0 {
+            syy
+        } else {
+            (syy - sxy * sxy / sxx).max(0.0)
+        }
     };
     let best_split = |a: usize, b: usize| -> Option<(usize, f64)> {
         if b - a < 2 * min_seg {
@@ -239,6 +279,38 @@ mod tests {
         assert_eq!(r.indices, vec![50, 100], "{:?}", r.indices);
         assert_eq!(r.segment_means.len(), 3);
         assert!((r.segment_means[1] - 20.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn binseg_linear_model_handles_trends() {
+        let y: Vec<f64> = noise(200, 0.5, 4)
+            .into_iter()
+            .enumerate()
+            .map(|(i, e)| 10.0 + 0.3 * i as f64 + if i >= 120 { 25.0 } else { 0.0 } + e)
+            .collect();
+        let r = detect(
+            &y,
+            ChangepointOptions {
+                method: ChangepointMethod::BinarySegmentation,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(r.indices, vec![120], "{:?}", r.indices);
+        let mean_model = detect(
+            &y,
+            ChangepointOptions {
+                method: ChangepointMethod::BinarySegmentation,
+                model: CostModel::Mean,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(
+            mean_model.indices.len() > 1,
+            "mean model chops trends: {:?}",
+            mean_model.indices
+        );
     }
 
     #[test]

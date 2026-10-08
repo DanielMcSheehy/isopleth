@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>isopleth gallery</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #1b1f24;
+        --muted: #6b7280;
+        --card: #f6f7f9;
+        --border: #e5e7eb;
+        --accent: #4269d0;
+        color-scheme: light;
+      }
+      [data-theme="dark"] {
+        --bg: #100c2a;
+        --fg: #e6e6ef;
+        --muted: #9aa0b4;
+        --card: #1a1636;
+        --border: #2c2850;
+        --accent: #97bbf5;
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+      header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 2; }
+      header h1 { font-size: 18px; margin: 0; letter-spacing: 0.02em; }
+      header h1 span { color: var(--muted); font-weight: 400; margin-left: 8px; font-size: 13px; }
+      header .spacer { flex: 1; }
+      header button, header label { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); color: var(--fg); cursor: pointer; }
+      header code { font-size: 12px; color: var(--muted); }
+      main { max-width: 1240px; margin: 0 auto; padding: 24px; display: grid; grid-template-columns: repeat(auto-fit, minmax(560px, 1fr)); gap: 24px; }
+      section.example { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+      section.example.wide { grid-column: 1 / -1; }
+      section.example h2 { font-size: 15px; margin: 0; }
+      section.example p { margin: 0; color: var(--muted); font-size: 13px; }
+      .chart { height: 360px; width: 100%; }
+      details { font-size: 12px; }
+      details summary { cursor: pointer; color: var(--muted); }
+      pre { margin: 6px 0 0; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: auto; font-size: 12px; line-height: 1.45; }
+      ul.insights { margin: 0; padding-left: 18px; font-size: 12.5px; }
+      ul.insights li::marker { color: var(--accent); }
+      .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12.5px; }
+      .controls input[type="range"] { width: 120px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>isopleth<span>composable charts on ECharts 6 · insights built in</span></h1>
+      <div class="spacer"></div>
+      <code id="backend">backend: js</code>
+      <button id="wasm">load wasm backend</button>
+      <button id="theme">dark mode</button>
+    </header>
+    <main id="gallery"></main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

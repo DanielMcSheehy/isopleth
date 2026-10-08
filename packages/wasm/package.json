@@ -1,0 +1,18 @@
+{
+  "name": "@isopleth/wasm",
+  "version": "0.1.0",
+  "description": "WebAssembly build of isopleth-core (wasm-bindgen output). Load it with `isopleth/wasm`.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./pkg/isopleth_wasm.js",
+  "types": "./pkg/isopleth_wasm.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/isopleth_wasm.d.ts",
+      "import": "./pkg/isopleth_wasm.js"
+    },
+    "./isopleth_wasm_bg.wasm": "./pkg/isopleth_wasm_bg.wasm"
+  },
+  "files": ["pkg"],
+  "sideEffects": false
+}
