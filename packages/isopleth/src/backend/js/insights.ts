@@ -614,15 +614,19 @@ export function seriesOutliers(series: Float64Array[], method: string, sensitivi
   for (let i = 0; i < len; i++) {
     column.length = 0;
     for (const s of series) column.push(s[i]);
-    const z = robustZ(column);
     const m = S.median(column);
     let s = S.mad(column) * S.MAD_TO_SIGMA;
-    if (!(s > 0)) s = Math.abs(S.mean(column.filter(Number.isFinite).map((v) => Math.abs(v - m)))) * 1.2533;
+    // When most series agree exactly (MAD = 0) any deviation is significant:
+    // fall back to half the mean absolute deviation rather than a normal-consistent scale.
+    if (!(s > 0)) s = Math.abs(S.mean(column.filter(Number.isFinite).map((v) => Math.abs(v - m)))) * 0.5;
     if (S.count(column) >= 3) {
       bandMin[i] = m - t * s;
       bandMax[i] = m + t * s;
     }
-    for (let k = 0; k < series.length; k++) scores[k][i] = Number.isFinite(z[k]) ? Math.min(1, Math.abs(z[k]) / t) : 0;
+    for (let k = 0; k < series.length; k++) {
+      const v = column[k];
+      scores[k][i] = Number.isFinite(v) && s > 0 ? Math.min(1, Math.abs(v - m) / s / t) : 0;
+    }
   }
   const outlying: number[] = [];
   scores.forEach((sc, k) => {
