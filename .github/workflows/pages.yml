@@ -17,7 +17,23 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages-enabled: ${{ steps.pages.outputs.enabled }}
     steps:
+      - name: Check whether GitHub Pages is enabled for this repository
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          if [ "$status" = "404" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=GitHub Pages is not enabled::The site was built but not deployed. Enable Pages once under Settings → Pages → Source: GitHub Actions (https://github.com/${{ github.repository }}/settings/pages); it deploys on the next push to main or by re-running this workflow."
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -40,6 +56,9 @@ jobs:
 
   deploy:
     needs: build
+    # Deploying to a repository without Pages enabled fails with a 404, so skip
+    # (with a warning from the build job) until it has been switched on once.
+    if: needs.build.outputs.pages-enabled == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

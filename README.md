@@ -263,7 +263,7 @@ scripts/shots.mjs       regenerates docs/img (screenshots, hero, GIF) with Playw
 
 ```sh
 npm install
-cargo test --workspace && npm test -w isopleth     # 41 Rust + 47 TS tests
+cargo test --workspace && npm test -w isopleth     # 41 Rust + 52 TS tests
 npm run build:wasm                                 # optional, needs wasm-pack (or fetch the wasm-pkg branch)
 npm run dev                                        # http://localhost:5173
 ```
@@ -277,6 +277,8 @@ npm run dev                                        # http://localhost:5173
 5. **Compile**: each mark × facet × series becomes ECharts series (`line`, `bar`, `scatter`, `heatmap`, `custom` for rects/bands/segments), with native stacking for zero-based stacks and exact polygons for arbitrary bands; axes, grids, legend, tooltip, visualMap and dataZoom are assembled around them.
 
 ### Releasing
+
+`.github/workflows/pages.yml` builds the demo on every push to `main` and deploys it to GitHub Pages (`https://danielmcsheehy.github.io/isopleth/`). Pages has to be switched on once — Settings → Pages → Source: *GitHub Actions* — until then the workflow builds, warns and skips the deploy.
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`: it rebuilds the wasm, runs both test suites, and publishes `isopleth-wasm` and `isopleth` to npm with provenance. Bump both `package.json` versions to the tag first. Authentication is npm trusted publishing (configure this repo + `release.yml` as a trusted publisher for each package on npmjs.com) or an `NPM_TOKEN` repository secret.
 
