@@ -1,4 +1,4 @@
-import * as ip from "isopleth";
+import * as ip from "@danielmcsheehy/isopleth";
 import { categoryCounts, fleet, penguins, sales, single, timeseries } from "./data.js";
 
 interface Example {
@@ -315,7 +315,7 @@ document.getElementById("wasm")!.addEventListener("click", async (e) => {
   btn.disabled = true;
   btn.textContent = "loading…";
   try {
-    const { loadWasm } = await import("isopleth/wasm");
+    const { loadWasm } = await import("@danielmcsheehy/isopleth/wasm");
     const backend = await ip.init(loadWasm());
     const pill = document.getElementById("backend")!;
     pill.innerHTML = `<code>backend: ${backend.name}</code>`;

@@ -7,7 +7,7 @@
 Composable charts on **Apache ECharts 6**, with the grammar of [Observable Plot](https://observablehq.com/plot/) and **insights built in** — anomalies, forecasts, changepoints, seasonality, trends and outliers — computed by a **Rust core** (compiled to WebAssembly, built on [augurs](https://github.com/grafana/augurs)) with a pure-TypeScript fallback that works everywhere.
 
 ```ts
-import * as ip from "isopleth";
+import * as ip from "@danielmcsheehy/isopleth";
 
 ip.plot({
   marks: [ip.auto(data, { x: "date", y: "value" })],
@@ -34,7 +34,7 @@ A chart is a list of **marks** (`lineY`, `areaY`, `barY`, `rectY`, `dot`, `cell`
 `isopleth/editor` is an optional, dependency-free panel that edits a **chart spec** — mark type, x/y/aggregate, colour by, size by, facet by, stacking, smoothing, time interval, curve, insights, per-series colours and theme — and re-renders on every change. The same spec round-trips to code with `specToCode()`, so the playground doubles as a snippet generator.
 
 ```ts
-import { createEditor, specToCode } from "isopleth/editor";
+import { createEditor, specToCode } from "@danielmcsheehy/isopleth/editor";
 
 const editor = createEditor(document.querySelector("#panel"), {
   data,
@@ -84,13 +84,13 @@ All of these are in the demo (`npm run dev`), in the `dark` theme; each is a han
 ## Install
 
 ```sh
-npm install isopleth echarts            # peer dependency: echarts >= 6
-npm install isopleth-wasm              # optional: the Rust/WASM backend
+npm install @danielmcsheehy/isopleth echarts            # peer dependency: echarts >= 6
+npm install @danielmcsheehy/isopleth-wasm              # optional: the Rust/WASM backend
 ```
 
 ```ts
-import * as ip from "isopleth";
-import { loadWasm } from "isopleth/wasm";
+import * as ip from "@danielmcsheehy/isopleth";
+import { loadWasm } from "@danielmcsheehy/isopleth/wasm";
 
 await ip.init(loadWasm());   // optional; falls back to the JS backend if it fails
 ```
@@ -230,7 +230,7 @@ ip.plot({ theme: { mode: "dark", grid: "#222" } }); // a partial over the built-
 
 ## Backends
 
-| | `js` (default) | `wasm` (`isopleth-wasm`) |
+| | `js` (default) | `wasm` (`@danielmcsheehy/isopleth-wasm`) |
 | --- | --- | --- |
 | binning, grouping, windows, maps, imputation | ✓ | ✓ |
 | anomalies (mad, zscore, iqr, seasonal, ewma) | ✓ | ✓ |
@@ -248,13 +248,13 @@ cargo install wasm-pack
 npm run build:wasm           # → packages/wasm/pkg
 ```
 
-CI builds the package on every push and publishes it to the [`wasm-pkg`](https://github.com/DanielMcSheehy/isopleth/tree/wasm-pkg) branch, so without a Rust toolchain you can `git archive origin/wasm-pkg | tar -x -C packages/wasm/pkg`. The test suite runs against both backends (`ISOPLETH_BACKEND=wasm npm test -w isopleth`); the 560 KB `.wasm` loads in the demo via the *load wasm backend* button.
+CI builds the package on every push and publishes it to the [`wasm-pkg`](https://github.com/DanielMcSheehy/isopleth/tree/wasm-pkg) branch, so without a Rust toolchain you can `git archive origin/wasm-pkg | tar -x -C packages/wasm/pkg`. The test suite runs against both backends (`ISOPLETH_BACKEND=wasm npm test -w @danielmcsheehy/isopleth`); the 560 KB `.wasm` loads in the demo via the *load wasm backend* button.
 
 ## Repository
 
 ```
 crates/isopleth-core    Rust kernels (bin, group, window, map, impute, insights/*)   cargo test
-crates/isopleth-wasm    wasm-bindgen bindings → isopleth-wasm                         npm run build:wasm
+crates/isopleth-wasm    wasm-bindgen bindings → @danielmcsheehy/isopleth-wasm        npm run build:wasm
 packages/isopleth       the TypeScript library                                        npm test · npm run build
 packages/wasm           npm package wrapping the wasm-pack output
 packages/demo           Vite gallery, playground (editor) and hero page                npm run dev
@@ -263,7 +263,7 @@ scripts/shots.mjs       regenerates docs/img (screenshots, hero, GIF) with Playw
 
 ```sh
 npm install
-cargo test --workspace && npm test -w isopleth     # 41 Rust + 52 TS tests
+cargo test --workspace && npm test -w @danielmcsheehy/isopleth     # 41 Rust + 52 TS tests
 npm run build:wasm                                 # optional, needs wasm-pack (or fetch the wasm-pkg branch)
 npm run dev                                        # http://localhost:5173
 ```
@@ -280,7 +280,7 @@ npm run dev                                        # http://localhost:5173
 
 `.github/workflows/pages.yml` builds the demo on every push to `main` and deploys it to GitHub Pages (`https://danielmcsheehy.github.io/isopleth/`). Pages has to be switched on once — Settings → Pages → Source: *GitHub Actions* — until then the workflow builds, warns and skips the deploy.
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`: it rebuilds the wasm, runs both test suites, and publishes `isopleth-wasm` and `isopleth` to npm with provenance. Bump both `package.json` versions to the tag first. Authentication is npm trusted publishing (configure this repo + `release.yml` as a trusted publisher for each package on npmjs.com) or an `NPM_TOKEN` repository secret.
+Pushing a `v*` tag runs `.github/workflows/release.yml`: it rebuilds the wasm, runs both test suites, and publishes `@danielmcsheehy/isopleth-wasm` and `@danielmcsheehy/isopleth` to npm with provenance. Bump both `package.json` versions to the tag first. Authentication is npm trusted publishing (this repo + `release.yml` as a trusted publisher for each package).
 
 ### Status
 

@@ -12,13 +12,13 @@
     "noEmit": true,
     "isolatedModules": true,
     "paths": {
-      "isopleth": [
+      "@danielmcsheehy/isopleth": [
         "../isopleth/src/index.ts"
       ],
-      "isopleth/wasm": [
+      "@danielmcsheehy/isopleth/wasm": [
         "../isopleth/src/backend/wasm.ts"
       ],
-      "isopleth/editor": [
+      "@danielmcsheehy/isopleth/editor": [
         "../isopleth/src/editor/index.ts"
       ]
     }

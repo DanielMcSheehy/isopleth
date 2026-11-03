@@ -1,12 +1,14 @@
 name: Release
 
-# Publishes `isopleth` and `isopleth-wasm` to npm when a version tag is pushed:
-#   npm version minor -w isopleth            # bumps packages/isopleth/package.json
+# Publishes `@danielmcsheehy/isopleth` and `@danielmcsheehy/isopleth-wasm` when a version tag is pushed:
+#   npm version minor -w @danielmcsheehy/isopleth
+#   npm version minor -w @danielmcsheehy/isopleth-wasm --no-git-tag-version
 #   git tag v0.2.0 && git push --tags
-# Both packages must carry the tag's version. Authentication is npm "trusted
-# publishing" (OIDC, no secret) — configure it once on npmjs.com for each
-# package (Settings → Publishing access → Trusted publisher: this repo +
-# workflow file `release.yml`). An `NPM_TOKEN` repository secret works too.
+# Both packages must carry the tag's version, and the library's optional wasm
+# dependency must match. Auth is npm trusted publishing (OIDC, no secret).
+# After the first manual publish, bind this workflow once:
+#   npm trust github @danielmcsheehy/isopleth --repo DanielMcSheehy/isopleth --file release.yml --allow-publish -y
+#   npm trust github @danielmcsheehy/isopleth-wasm --repo DanielMcSheehy/isopleth --file release.yml --allow-publish -y
 
 on:
   push:
@@ -40,18 +42,16 @@ jobs:
             V=$(node -p "require('./$p').version")
             [ "$V" = "$TAG" ] || { echo "$p is $V but tag is $TAG"; exit 1; }
           done
+          DEP=$(node -p "require('./packages/isopleth/package.json').optionalDependencies['@danielmcsheehy/isopleth-wasm']")
+          [ "$DEP" = "$TAG" ] || { echo "optional wasm dep is $DEP but tag is $TAG"; exit 1; }
       - run: cargo test --workspace
       - name: Build wasm
         run: |
           curl -sSf https://rustwasm.github.io/wasm-pack/installer/init.sh | sh
           npm run build:wasm
-      - run: npm run typecheck -w isopleth && npm test -w isopleth && ISOPLETH_BACKEND=wasm npm test -w isopleth
-      - run: npm run build -w isopleth
+      - run: npm run typecheck -w @danielmcsheehy/isopleth && npm test -w @danielmcsheehy/isopleth && ISOPLETH_BACKEND=wasm npm test -w @danielmcsheehy/isopleth
+      - run: npm run build -w @danielmcsheehy/isopleth
       - name: Publish isopleth-wasm
-        run: npm publish --provenance --access public -w isopleth-wasm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public -w @danielmcsheehy/isopleth-wasm
       - name: Publish isopleth
-        run: npm publish --provenance --access public -w isopleth
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public -w @danielmcsheehy/isopleth

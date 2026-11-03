@@ -1,5 +1,5 @@
-import * as ip from "isopleth";
-import { createEditor, specToCode, type ChartSpec } from "isopleth/editor";
+import * as ip from "@danielmcsheehy/isopleth";
+import { createEditor, specToCode, type ChartSpec } from "@danielmcsheehy/isopleth/editor";
 import { categoryCounts, fleet, penguins, sales, single, timeseries } from "./data.js";
 
 const datasets: Record<string, { data: object[]; spec: Partial<ChartSpec> }> = {

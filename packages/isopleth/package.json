@@ -1,12 +1,12 @@
 {
-  "name": "isopleth",
+  "name": "@danielmcsheehy/isopleth",
   "version": "0.1.0",
   "description": "Composable, Observable-Plot-style chart grammar on top of Apache ECharts 6, with built-in insights (anomalies, forecasts, changepoints, outliers) backed by a Rust/WASM core.",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/DanielMcSheehy/isopleth.git",
+    "url": "git+https://github.com/DanielMcSheehy/isopleth.git",
     "directory": "packages/isopleth"
   },
   "keywords": [
@@ -53,7 +53,7 @@
     "echarts": "^6.0.0"
   },
   "optionalDependencies": {
-    "isopleth-wasm": "*"
+    "@danielmcsheehy/isopleth-wasm": "0.1.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",

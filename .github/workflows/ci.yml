@@ -50,9 +50,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck -w isopleth
-      - run: npm test -w isopleth
-      - run: npm run build -w isopleth
+      - run: npm run typecheck -w @danielmcsheehy/isopleth
+      - run: npm test -w @danielmcsheehy/isopleth
+      - run: npm run build -w @danielmcsheehy/isopleth
 
   typescript-wasm:
     name: TypeScript tests on the wasm backend + demo build
@@ -69,6 +69,6 @@ jobs:
           name: isopleth-wasm
           path: packages/wasm/pkg
       - run: npm ci
-      - run: ISOPLETH_BACKEND=wasm npm test -w isopleth
-      - run: npm run build -w isopleth
+      - run: ISOPLETH_BACKEND=wasm npm test -w @danielmcsheehy/isopleth
+      - run: npm run build -w @danielmcsheehy/isopleth
       - run: npm run build -w @isopleth/demo

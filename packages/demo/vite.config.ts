@@ -8,11 +8,11 @@ export default defineConfig({
   server: { port: 5173, fs: { allow: [".."] } },
   resolve: {
     alias: [
-      { find: "isopleth/wasm", replacement: src("backend/wasm.ts") },
-      { find: "isopleth/editor", replacement: src("editor/index.ts") },
-      { find: /^isopleth$/, replacement: src("index.ts") },
+      { find: "@danielmcsheehy/isopleth/wasm", replacement: src("backend/wasm.ts") },
+      { find: "@danielmcsheehy/isopleth/editor", replacement: src("editor/index.ts") },
+      { find: /^@danielmcsheehy\/isopleth$/, replacement: src("index.ts") },
     ],
   },
-  optimizeDeps: { exclude: ["isopleth-wasm", "isopleth"] },
+  optimizeDeps: { exclude: ["@danielmcsheehy/isopleth-wasm", "@danielmcsheehy/isopleth"] },
   build: { target: "es2022", rollupOptions: { input: { main: "index.html", playground: "playground.html", hero: "hero.html" } } },
 });

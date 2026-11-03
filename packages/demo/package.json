@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "echarts": "^6.1.0",
-    "isopleth": "*"
+    "@danielmcsheehy/isopleth": "*"
   },
   "devDependencies": {
     "vite": "^6.0.0",

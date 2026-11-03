@@ -1,7 +1,7 @@
 {
-  "name": "isopleth-wasm",
+  "name": "@danielmcsheehy/isopleth-wasm",
   "version": "0.1.0",
-  "description": "WebAssembly build of isopleth-core (wasm-bindgen output). Load it with `isopleth/wasm`.",
+  "description": "WebAssembly build of isopleth-core (wasm-bindgen output). Load it with `@danielmcsheehy/isopleth/wasm`.",
   "type": "module",
   "license": "MIT",
   "main": "./pkg/isopleth_wasm.js",
@@ -19,7 +19,7 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "https://github.com/DanielMcSheehy/isopleth.git",
+    "url": "git+https://github.com/DanielMcSheehy/isopleth.git",
     "directory": "packages/wasm"
   },
   "keywords": [

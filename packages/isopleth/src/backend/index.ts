@@ -3,8 +3,8 @@
  * `useBackend()`) to switch to the WebAssembly build of `isopleth-core`.
  *
  * ```ts
- * import * as ip from "isopleth";
- * import { loadWasm } from "isopleth/wasm";
+ * import * as ip from "@danielmcsheehy/isopleth";
+ * import { loadWasm } from "@danielmcsheehy/isopleth/wasm";
  * await ip.init(loadWasm());   // optional, once
  * ```
  */

@@ -2,7 +2,7 @@
  * isopleth — composable charts on Apache ECharts 6 with built-in insights.
  *
  * ```ts
- * import * as ip from "isopleth";
+ * import * as ip from "@danielmcsheehy/isopleth";
  *
  * const chart = ip.plot({
  *   marks: [

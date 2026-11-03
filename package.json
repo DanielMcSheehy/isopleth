@@ -6,12 +6,12 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w isopleth",
+    "build": "npm run build -w @danielmcsheehy/isopleth",
     "build:wasm": "wasm-pack build crates/isopleth-wasm --target web --release --out-dir ../../packages/wasm/pkg --out-name isopleth_wasm && node scripts/fix-wasm-pkg.mjs",
-    "test": "cargo test --workspace && npm run typecheck -w isopleth && npm test -w isopleth",
-    "typecheck": "npm run typecheck -w isopleth",
+    "test": "cargo test --workspace && npm run typecheck -w @danielmcsheehy/isopleth && npm test -w @danielmcsheehy/isopleth",
+    "typecheck": "npm run typecheck -w @danielmcsheehy/isopleth",
     "dev": "npm run dev -w @isopleth/demo",
-    "lint": "cargo clippy --workspace --all-targets -- -D warnings && npm run lint -w isopleth"
+    "lint": "cargo clippy --workspace --all-targets -- -D warnings && npm run lint -w @danielmcsheehy/isopleth"
   },
   "devDependencies": {
     "playwright": "^1.64.0",

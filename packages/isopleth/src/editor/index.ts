@@ -1,12 +1,12 @@
 /**
- * `isopleth/editor` — an optional, framework-free panel for composing a chart
+ * `@danielmcsheehy/isopleth/editor` — an optional, framework-free panel for composing a chart
  * interactively: mark type, encodings (x / y / aggregate / colour / size /
  * facet), composition (stack, smoothing, time interval, curve), insights,
  * per-series colours and theme. It edits a `ChartSpec` and re-renders the
  * chart on every change; `specToCode()` gives the equivalent `ip.plot()` call.
  *
  * ```ts
- * import { createEditor } from "isopleth/editor";
+ * import { createEditor } from "@danielmcsheehy/isopleth/editor";
  * const editor = createEditor(document.querySelector("#panel")!, {
  *   data, target: document.querySelector("#chart")!,
  *   spec: { mark: "auto", x: "date", y: "value", color: "series" },

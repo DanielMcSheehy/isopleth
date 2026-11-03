@@ -1,4 +1,4 @@
-import * as ip from "isopleth";
+import * as ip from "@danielmcsheehy/isopleth";
 import { fleet, sales, single, timeseries } from "./data.js";
 
 const web = single(200);
