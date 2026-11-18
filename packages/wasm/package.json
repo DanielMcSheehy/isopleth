@@ -1,6 +1,6 @@
 {
   "name": "@danielmcsheehy/isopleth-wasm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "WebAssembly build of isopleth-core (wasm-bindgen output). Load it with `@danielmcsheehy/isopleth/wasm`.",
   "type": "module",
   "license": "MIT",
