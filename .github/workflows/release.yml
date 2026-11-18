@@ -51,7 +51,10 @@ jobs:
           npm run build:wasm
       - run: npm run typecheck -w @danielmcsheehy/isopleth && npm test -w @danielmcsheehy/isopleth && ISOPLETH_BACKEND=wasm npm test -w @danielmcsheehy/isopleth
       - run: npm run build -w @danielmcsheehy/isopleth
+      # Publish from each package directory so npm's OIDC exchange targets that package (not the workspace root).
       - name: Publish isopleth-wasm
-        run: npm publish --access public -w @danielmcsheehy/isopleth-wasm
+        working-directory: packages/wasm
+        run: npm publish --access public --loglevel verbose
       - name: Publish isopleth
-        run: npm publish --access public -w @danielmcsheehy/isopleth
+        working-directory: packages/isopleth
+        run: npm publish --access public --loglevel verbose
