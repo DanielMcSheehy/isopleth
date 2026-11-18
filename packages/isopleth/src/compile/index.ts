@@ -25,6 +25,8 @@ export interface Compiled {
   resolved: ResolvedMark[];
   plan: FacetPlan;
   theme: Theme;
+  /** Grid option for a given chart height (default margins shrink on short charts); used to refit at render time. */
+  gridFor: (height: number | undefined) => Record<string, unknown>[];
 }
 
 export function compile(options: PlotOptions): Compiled {
@@ -51,7 +53,8 @@ export function compile(options: PlotOptions): Compiled {
     for (const rm of all) {
       const c = compileMark(rm, f, ctx);
       series.push(...c.series);
-      for (const n of c.legend) if (!legendNames.includes(n)) legendNames.push(n);
+      // Literal colours are not categories worth a legend entry.
+      for (const n of c.legend) if (!legendNames.includes(n) && !(scales.color.identity && scales.color.index.has(n))) legendNames.push(n);
       if (f === 0 && !rm.mark.generated && c.series.length) tooltipVotes = { ...tooltipVotes, [c.tooltip]: tooltipVotes[c.tooltip] + 1 };
     }
   }
@@ -61,7 +64,14 @@ export function compile(options: PlotOptions): Compiled {
   const hasLegend = !(options.legend === false || legendNames.length === 0);
   const hasSlider = [scales.x.options.zoom, scales.y.options.zoom].some((z) => z === true || z === "slider");
   const hasColorBar = scales.color.kind === "continuous" && scales.color.legend && ctx.visualTargets.length > 0;
-  const layout = facetLayout(plan, options, { legend: hasLegend, slider: hasSlider, colorBar: hasColorBar, titleLines: (options.title ? 1 : 0) + subtitleLines.length });
+  const layoutNeeds: LayoutNeeds = { legend: hasLegend, slider: hasSlider, colorBar: hasColorBar, titleLines: (options.title ? 1 : 0) + subtitleLines.length };
+  const gridOption = (grids: GridBox[]) => grids.map((g) => ({ ...g, containLabel: false, outerBoundsMode: "auto" as const }));
+  const userGrid = (options.echarts as Record<string, unknown> | undefined)?.grid;
+  const gridFor = (height: number | undefined) => {
+    const grid = gridOption(facetLayout(plan, options, layoutNeeds, height).grids);
+    return (userGrid === undefined ? grid : mergeOption({ grid }, { grid: userGrid }).grid) as Record<string, unknown>[];
+  };
+  const layout = facetLayout(plan, options, layoutNeeds, options.height);
   const xAxes = plan.keys.map((_, f) => axisOption("x", scales.x, f, plan, options, userMarks, theme));
   const yAxes = plan.keys.map((_, f) => axisOption("y", scales.y, f, plan, options, userMarks, theme));
   const hasFrame = userMarks.some((m) => m.type === "frame");
@@ -142,7 +152,7 @@ export function compile(options: PlotOptions): Compiled {
     textStyle: { fontFamily: theme.font, color: theme.text },
     ...(scales.color.kind === "categorical" ? { color: scales.color.range } : {}),
     title: titles,
-    grid: layout.grids.map((g) => ({ ...g, containLabel: false, outerBoundsMode: "auto" })),
+    grid: gridOption(layout.grids),
     xAxis: xAxes,
     yAxis: yAxes,
     series: series as any,
@@ -153,8 +163,8 @@ export function compile(options: PlotOptions): Compiled {
     ...(options.toolbox ? { toolbox: { feature: { saveAsImage: {}, dataZoom: {}, restore: {} }, right: 8 } } : {}),
     ...(nFacets > 1 ? { axisPointer: { link: [{ xAxisIndex: "all" }] } } : {}),
   };
-  const merged = options.echarts ? deepMerge(option as Record<string, unknown>, options.echarts as Record<string, unknown>) : option;
-  return { option: merged as EChartsOption, insights: ins.insights, warnings: ins.warnings, scales, marks: [...userMarks, ...ins.marks], resolved: all, plan, theme };
+  const merged = options.echarts ? mergeOption(option as Record<string, unknown>, options.echarts as Record<string, unknown>) : option;
+  return { option: merged as EChartsOption, insights: ins.insights, warnings: ins.warnings, scales, marks: [...userMarks, ...ins.marks], resolved: all, plan, theme, gridFor };
 }
 
 /** Join notes with separators, wrapping onto new lines past `width` characters. */
@@ -189,7 +199,7 @@ interface LayoutNeeds {
   titleLines: number;
 }
 
-function facetLayout(plan: FacetPlan, options: PlotOptions, needs: LayoutNeeds): { grids: GridBox[] } {
+function facetLayout(plan: FacetPlan, options: PlotOptions, needs: LayoutNeeds, height: number | undefined): { grids: GridBox[] } {
   const cols = Math.max(1, plan.xs.length || 1);
   const rows = Math.max(1, plan.ys.length || 1);
   const multi = plan.keys.length > 1;
@@ -197,8 +207,18 @@ function facetLayout(plan: FacetPlan, options: PlotOptions, needs: LayoutNeeds):
   const hasTitle = needs.titleLines > 0;
   const bottomExtra = (needs.legend ? 24 : 0) + (needs.slider ? 30 : 0) + (options.caption ? 16 : 0);
   if (!multi) {
-    const topPad = m.top ?? (hasTitle ? 24 + needs.titleLines * 16 : 20);
-    const bottomPad = m.bottom ?? 48 + bottomExtra;
+    let topPad = m.top ?? (hasTitle ? 24 + needs.titleLines * 16 : 20);
+    let bottomPad = m.bottom ?? 48 + bottomExtra;
+    // Short charts (sparklines): default margins would swallow the plot, so they shrink to at most half the height.
+    if (height !== undefined) {
+      const flex = (m.top === undefined ? topPad : 0) + (m.bottom === undefined ? bottomPad : 0);
+      const budget = Math.max(0, height / 2 - (topPad + bottomPad - flex));
+      if (flex > budget) {
+        const k = budget / flex;
+        if (m.top === undefined) topPad = Math.round(topPad * k);
+        if (m.bottom === undefined) bottomPad = Math.round(bottomPad * k);
+      }
+    }
     const leftPad = m.left ?? 56;
     const rightPad = m.right ?? (needs.colorBar ? 90 : 20);
     return { grids: [{ left: `${leftPad}px`, top: `${topPad}px`, right: `${rightPad}px`, bottom: `${bottomPad}px` }] };
@@ -353,15 +373,38 @@ function buildDataZoom(scales: Scales, nFacets: number, hasLegend: boolean, them
   return out;
 }
 
-export function deepMerge(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+/** Components emitted once per facet: an object in the escape hatch patches every entry. */
+const PER_FACET = new Set(["xAxis", "yAxis", "grid"]);
+
+/**
+ * Merge the `echarts` escape hatch into the compiled option. Series are appended. Where isopleth emits an
+ * array (axes, grids, titles, visualMaps, dataZooms), an array patches entry by entry and an object patches
+ * every entry for axes and grids, the first entry otherwise.
+ */
+export function mergeOption(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...a };
   for (const [k, v] of Object.entries(b)) {
     const cur = out[k];
-    if (v && typeof v === "object" && !Array.isArray(v) && cur && typeof cur === "object" && !Array.isArray(cur)) out[k] = deepMerge(cur as Record<string, unknown>, v as Record<string, unknown>);
-    else if (Array.isArray(v) && Array.isArray(cur) && k === "series") out[k] = [...cur, ...v];
-    else out[k] = v;
+    if (k === "series" && Array.isArray(cur)) out[k] = [...cur, ...(Array.isArray(v) ? v : [v])];
+    else if (Array.isArray(cur) && Array.isArray(v)) out[k] = [...cur.map((c, i) => (i < v.length ? mergeValue(c, v[i]) : c)), ...v.slice(cur.length)];
+    else if (Array.isArray(cur) && isPlainObject(v)) out[k] = cur.map((c, i) => (PER_FACET.has(k) || i === 0 ? mergeValue(c, v) : c));
+    else out[k] = mergeValue(cur, v);
   }
   return out;
+}
+
+function deepMerge(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...a };
+  for (const [k, v] of Object.entries(b)) out[k] = mergeValue(out[k], v);
+  return out;
+}
+
+function mergeValue(cur: unknown, v: unknown): unknown {
+  return isPlainObject(cur) && isPlainObject(v) ? deepMerge(cur, v) : v;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
 export { getBackend };

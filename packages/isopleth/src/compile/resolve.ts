@@ -33,6 +33,8 @@ export interface ResolvedMark {
   labels: Partial<Record<ChannelName, string>>;
   /** True when the mark is faceted (its rows are split across facets). */
   faceted: boolean;
+  /** The plot forces a categorical color scale (`color: { type: "categorical" }`), so numeric fill/stroke still split series. */
+  categoricalColor: boolean;
 }
 
 const facetKeyOf = (fx: Value, fy: Value) => `${String(keyof(fx))}\u0000${String(keyof(fy))}`;
@@ -152,7 +154,8 @@ export function resolveMark(mark: Mark, plan: FacetPlan, options: PlotOptions): 
   // Derived labels for transformed channels (bins/groups keep the input name).
   const extra: Record<string, Value[]> = {};
   if (opts.channels) for (const [k, ch] of Object.entries(opts.channels)) extra[k] = valueof(data, ch) ?? [];
-  return { mark, data, facets, channels, extra, constants, labels, faceted };
+  const categoricalColor = options.color?.type === "categorical" || options.color?.type === "ordinal";
+  return { mark, data, facets, channels, extra, constants, labels, faceted, categoricalColor };
 }
 
 /** Scale type of a set of channels (first defined wins; ordinal dominates). */

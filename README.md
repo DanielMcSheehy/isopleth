@@ -95,6 +95,17 @@ import { loadWasm } from "@danielmcsheehy/isopleth/wasm";
 await ip.init(loadWasm());   // optional; falls back to the JS backend if it fails
 ```
 
+Without a bundler, load the self-contained browser build. It is one ES module with ECharts bundled in, so the page needs no import map and no `process` shim:
+
+```html
+<script type="module">
+  import * as ip from "https://cdn.jsdelivr.net/npm/@danielmcsheehy/isopleth/dist/isopleth.browser.js";
+  ip.plot({ marks: [ip.barY([{ k: "a", v: 3 }, { k: "b", v: 5 }], { x: "k", y: "v" })] }).render(document.querySelector("#chart"));
+</script>
+```
+
+Bundlers can import the same file as `@danielmcsheehy/isopleth/browser`. It covers the main entry only; the WASM backend is still loaded through `@danielmcsheehy/isopleth/wasm`.
+
 ## Why
 
 - **Composable, not configurable.** ECharts options are powerful but imperative; every chart becomes a bespoke object. isopleth gives you Plot's small algebra — data + channels + transforms + marks — and compiles it to ECharts, so you keep ECharts' rendering, interaction, themes and ecosystem.

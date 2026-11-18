@@ -55,7 +55,7 @@ interface SeriesGroup {
 /** Split a facet's indices into series by the `z` channel (order of first appearance). */
 export function groupSeries(rm: ResolvedMark, I: readonly number[]): SeriesGroup[] {
   const Z = rm.channels.z ?? rm.channels.fill ?? rm.channels.stroke;
-  const colorIsContinuous = rm.channels.z === undefined && ((rm.channels.fill && isNumeric(rm.channels.fill)) || (rm.channels.stroke && isNumeric(rm.channels.stroke)));
+  const colorIsContinuous = rm.channels.z === undefined && !rm.categoricalColor && ((rm.channels.fill && isNumeric(rm.channels.fill)) || (rm.channels.stroke && isNumeric(rm.channels.stroke)));
   if (!Z || colorIsContinuous) return [{ key: null, value: undefined, index: I.slice() }];
   const groups = new Map<string | number | boolean | null, SeriesGroup>();
   for (const i of I) {
@@ -205,7 +205,7 @@ function compileLine(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
 }
 
 function continuousColorDim(rm: ResolvedMark): Value[] | undefined {
-  if (rm.channels.z !== undefined) return undefined;
+  if (rm.channels.z !== undefined || rm.categoricalColor) return undefined;
   const c = rm.channels.fill ?? rm.channels.stroke;
   return c && isNumeric(c) ? c : undefined;
 }
@@ -452,35 +452,40 @@ function compileBar(rm: ResolvedMark, I: number[], ctx: CompileContext, horizont
       applySeriesStyle(s, rm, g, ctx);
       series.push(s);
     } else {
-      const stackId = `${rm.mark.id}:${ctx.facet}:${k}:band`;
-      const base: AnySeries = {
+      // Floating bars (explicit x1/x2 or offset stacks): rects between the two edges, centred in the band.
+      // Native bars always grow from the axis origin, which would drag the extent to 0 (1970 on a time axis).
+      const data = g.index.map((i) => {
+        const v1 = toNumber(B1![i]);
+        const v2 = toNumber(B2[i]);
+        const row: (number | string | null)[] = [coord(ps, P[i]), Number.isFinite(v1) ? v1 : null, Number.isFinite(v2) ? v2 : null];
+        if (colorDim) row.push(toNumber(colorDim[i]));
+        return withHighlight(row, rm, i, ctx);
+      });
+      const valueName = rm.labels[horizontal ? "x" : "y"] ?? "value";
+      const [c1, c2] = horizontal ? (["x1", "x2"] as const) : (["y1", "y2"] as const);
+      const s: AnySeries = {
         ...baseSeries(rm, g, ctx, k),
-        ...common,
-        id: `${rm.mark.id}:${ctx.facet}:${k}:base`,
-        name: `${seriesName(rm, g)} (base)`,
-        data: g.index.map((i) => pair(i, Number.isFinite(toNumber(B1![i])) ? toNumber(B1![i]) : null)),
-        stack: stackId,
-        stackStrategy: "all",
-        itemStyle: { color: "transparent", opacity: 0 },
-        silent: true,
-        tooltip: { show: false },
-        emphasis: { disabled: true },
-        label: undefined,
-      };
-      const seg: AnySeries = {
-        ...baseSeries(rm, g, ctx, k),
-        ...common,
-        data: g.index.map((i) => {
-          const v1 = toNumber(B1![i]);
-          const v2 = toNumber(B2[i]);
-          const h = Number.isFinite(v1) && Number.isFinite(v2) ? v2 - v1 : NaN;
-          return withHighlight(pair(i, Number.isFinite(h) ? h : null), rm, i, ctx);
+        type: "custom",
+        data,
+        dimensions: [rm.labels[horizontal ? "y" : "x"] ?? "key", rm.labels[c1] ?? `${valueName} start`, rm.labels[c2] ?? `${valueName} end`, rm.labels.fill ?? "color"],
+        encode: horizontal ? { y: 0, x: [1, 2], tooltip: [1, 2] } : { x: 0, y: [1, 2], tooltip: [1, 2] },
+        itemStyle,
+        clip: true,
+        renderItem: makeIntervalBarRenderer(horizontal, {
+          band: ps.type === "ordinal",
+          padding: ps.options.padding ?? 0.3,
+          maxWidth: Number((o as Record<string, unknown>).barMaxWidth ?? ctx.theme.mark.barMaxWidth),
+          radius: (o as Record<string, unknown>).borderRadius ?? (stackedMark ? 0 : r),
+          label: o.label ? (typeof o.label === "string" ? o.label : true) : false,
+          labelColor: ctx.theme.text,
+          font: ctx.theme.font,
         }),
-        stack: stackId,
-        stackStrategy: "all",
+        emphasis: { focus: "series" },
+        blur: { itemStyle: { opacity: 0.25 } },
       };
-      applySeriesStyle(seg, rm, g, ctx);
-      series.push(base, seg);
+      if (colorDim) ctx.visualTargets.push({ seriesId: s.id, dimension: 3 });
+      applySeriesStyle(s, rm, g, ctx);
+      series.push(s);
     }
     if (!rm.mark.generated && o.legend !== false && (g.value !== undefined || o.name)) legend.push(seriesName(rm, g));
   });
@@ -544,6 +549,46 @@ function compileRect(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
   return { series, legend, tooltip: "item" };
 }
 
+interface IntervalBarStyle {
+  /** True when the position axis is a band (category) axis. */
+  band: boolean;
+  padding: number;
+  maxWidth: number;
+  radius: unknown;
+  /** `false`: no label; `true`: the interval length; string: ECharts-style template where `{c}` is the length. */
+  label: string | boolean;
+  labelColor: string;
+  font: string;
+}
+
+/** A bar spanning value dims 1–2, centred on position dim 0 and sized to the band like a native bar. */
+function makeIntervalBarRenderer(horizontal: boolean, st: IntervalBarStyle) {
+  return (_params: any, api: any) => {
+    const p = api.value(0);
+    const a = api.value(1);
+    const b = api.value(2);
+    if ([p, a, b].some((v: unknown) => v === null || v === undefined || Number.isNaN(v))) return null;
+    // Off a band axis there is no band to fill, so fall back to a fixed thickness.
+    const band = st.band ? api.size(horizontal ? [0, 1] : [1, 0])[horizontal ? 1 : 0] : 16;
+    const thick = Math.max(1, Math.min(band * (1 - st.padding), st.maxWidth));
+    const pa = api.coord(horizontal ? [a, p] : [p, a]);
+    const pb = api.coord(horizontal ? [b, p] : [p, b]);
+    const shape = horizontal
+      ? { x: Math.min(pa[0], pb[0]), y: pa[1] - thick / 2, width: Math.abs(pb[0] - pa[0]), height: thick, r: st.radius }
+      : { x: pa[0] - thick / 2, y: Math.min(pa[1], pb[1]), width: thick, height: Math.abs(pb[1] - pa[1]), r: st.radius };
+    const length = formatValue(b - a);
+    const text = st.label === false ? undefined : typeof st.label === "string" ? st.label.replace(/\{c\}/g, length) : length;
+    return {
+      type: "rect",
+      shape,
+      style: { fill: api.visual("color"), opacity: api.visual("opacity") ?? 1, stroke: api.visual("borderColor"), lineWidth: api.visual("borderWidth") ?? 0 },
+      ...(text === undefined
+        ? {}
+        : { textContent: { type: "text", style: { text, fill: st.labelColor, fontSize: 11, fontFamily: st.font } }, textConfig: { position: horizontal ? "right" : "top", distance: 4 } }),
+    };
+  };
+}
+
 function makeRectRenderer(inset: number, visual: boolean) {
   return (params: any, api: any) => {
     const x1 = api.value(0);
@@ -565,23 +610,22 @@ function makeRectRenderer(inset: number, visual: boolean) {
 
 // ------------------------------------------------------------------ cell ---
 
+/** Cells with a continuous fill: an ECharts heatmap coloured by the visualMap. */
 function compileCell(rm: ResolvedMark, I: number[], ctx: CompileContext): CompiledMark {
   const o = rm.mark.options;
   const { x: xs, y: ys } = ctx.scales;
   const X = rm.channels.x!;
   const Y = rm.channels.y!;
   const fill = rm.channels.fill ?? rm.channels.stroke;
-  const continuous = fill && isNumeric(fill);
-  const constant = rm.constants.fill;
+  // ECharts heatmaps only colour through a visualMap, so categorical/constant cells are drawn as custom rects.
+  if (!fill || !isNumeric(fill) || rm.categoricalColor) return compileCategoricalCell(rm, I, ctx);
   const { names: tipNames, values: tipValues } = tooltipDims(rm);
   const data = I.map((i) => {
-    const row: AnySeries = { value: [coord(xs, X[i]), coord(ys, Y[i]), fill ? (continuous ? toNumber(fill[i]) : formatValue(fill[i])) : 1, ...tipValues.map((v) => formatValue(v[i]))] };
-    const cellColor = fill ? ctx.scales.color.colorOf(fill[i]) : (constant as string | undefined);
-    if (fill && !continuous) row.itemStyle = { color: cellColor };
-    else if (constant) row.itemStyle = { color: constant };
+    const row: AnySeries = { value: [coord(xs, X[i]), coord(ys, Y[i]), toNumber(fill[i]), ...tipValues.map((v) => formatValue(v[i]))] };
+    const cellColor = ctx.scales.color.colorOf(fill[i]);
     if (o.label && cellColor) row.label = { color: inkOn(cellColor) };
     const h = ctx.highlights.get(rm.mark.id)?.get(i);
-    if (h?.color) row.itemStyle = { ...(row.itemStyle ?? {}), borderColor: h.color, borderWidth: 2 };
+    if (h?.color) row.itemStyle = { borderColor: h.color, borderWidth: 2 };
     return row;
   });
   const g: SeriesGroup = { key: null, value: undefined, index: I };
@@ -595,8 +639,55 @@ function compileCell(rm: ResolvedMark, I: number[], ctx: CompileContext): Compil
     itemStyle: { borderColor: ctx.theme.background, borderWidth: o.inset ?? ctx.theme.mark.gap, borderRadius: 3, opacity: o.fillOpacity ?? o.opacity ?? 1 },
     emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.3)" } },
   };
-  if (continuous) ctx.visualTargets.push({ seriesId: s.id, dimension: 2 });
+  ctx.visualTargets.push({ seriesId: s.id, dimension: 2 });
   return { series: [s], legend: [], tooltip: "item" };
+}
+
+function compileCategoricalCell(rm: ResolvedMark, I: number[], ctx: CompileContext): CompiledMark {
+  const o = rm.mark.options;
+  const { x: xs, y: ys } = ctx.scales;
+  const X = rm.channels.x!;
+  const Y = rm.channels.y!;
+  const fill = rm.channels.fill ?? rm.channels.stroke;
+  const { names: tipNames, values: tipValues } = tooltipDims(rm);
+  const inset = (o.inset ?? ctx.theme.mark.gap) / 2;
+  const series: AnySeries[] = [];
+  const legend: string[] = [];
+  groupSeries(rm, I).forEach((g, k) => {
+    const color = colorFor(rm, g, ctx, "fill");
+    const ink = typeof color === "string" ? inkOn(color) : ctx.theme.text;
+    const borders = g.index.map((i) => ctx.highlights.get(rm.mark.id)?.get(i)?.color);
+    const data = g.index.map((i) => [coord(xs, X[i]), coord(ys, Y[i]), fill ? formatValue(fill[i]) : "", ...tipValues.map((v) => formatValue(v[i]))]);
+    const s: AnySeries = {
+      ...baseSeries(rm, g, ctx, k),
+      type: "custom",
+      data,
+      dimensions: ["x", "y", rm.labels.fill ?? "value", ...tipNames],
+      encode: { x: 0, y: 1, tooltip: [...(fill ? [2] : []), ...tipNames.map((_, j) => 3 + j)] },
+      itemStyle: { ...(color ? { color } : {}), opacity: o.fillOpacity ?? o.opacity ?? 1 },
+      clip: true,
+      renderItem: (params: any, api: any) => {
+        const x = api.value(0);
+        const y = api.value(1);
+        if (Number.isNaN(x) || Number.isNaN(y)) return null;
+        const c = api.coord([x, y]);
+        const [w, h] = api.size([1, 1]);
+        const border = borders[params.dataIndex];
+        const text = data[params.dataIndex][2];
+        return {
+          type: "rect",
+          shape: { x: c[0] - w / 2 + inset, y: c[1] - h / 2 + inset, width: Math.max(0, w - 2 * inset), height: Math.max(0, h - 2 * inset), r: 3 },
+          style: { fill: api.visual("color"), opacity: api.visual("opacity") ?? 1, ...(border ? { stroke: border, lineWidth: 2 } : {}) },
+          ...(o.label && text ? { textContent: { type: "text", style: { text, fill: ink, fontSize: 11, fontFamily: ctx.theme.font } }, textConfig: { position: "inside" } } : {}),
+        };
+      },
+      emphasis: { focus: "series" },
+    };
+    applySeriesStyle(s, rm, g, ctx);
+    series.push(s);
+    if (!rm.mark.generated && o.legend !== false && (g.value !== undefined || o.name)) legend.push(s.name);
+  });
+  return { series, legend, tooltip: "item" };
 }
 
 // ------------------------------------------------------------------- dot ---

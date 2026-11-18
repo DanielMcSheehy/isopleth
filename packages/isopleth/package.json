@@ -32,6 +32,10 @@
       "types": "./dist/backend/wasm.d.ts",
       "import": "./dist/backend/wasm.js"
     },
+    "./browser": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/isopleth.browser.js"
+    },
     "./editor": {
       "types": "./dist/editor/index.d.ts",
       "import": "./dist/editor/index.js"
@@ -42,7 +46,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-browser.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -58,6 +62,7 @@
   "devDependencies": {
     "@types/node": "^26.6.4",
     "echarts": "^6.1.0",
+    "esbuild": "^0.21.5",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },

@@ -56,7 +56,16 @@ export function registerECharts(): void {
   ]);
 }
 
-const instances = new WeakMap<HTMLElement, { chart: ChartInstance; cleanup: () => void }>();
+interface Entry {
+  chart: ChartInstance;
+  /** The chart currently shown (re-renders swap it). */
+  source: Chart;
+  /** Serialized grid last applied, so refits only call `setOption` when the layout changes. */
+  gridKey: string;
+  cleanup: () => void;
+}
+
+const instances = new WeakMap<HTMLElement, Entry>();
 
 /** Render a compiled chart into `element`. Re-rendering into the same element reuses the instance. */
 export function renderChart(chart: Chart, element: HTMLElement, opts: RenderOptions = {}): ChartInstance {
@@ -70,22 +79,39 @@ export function renderChart(chart: Chart, element: HTMLElement, opts: RenderOpti
       height: opts.height ?? chart.options.height,
       devicePixelRatio: opts.devicePixelRatio,
     }) as unknown as ChartInstance;
-    let cleanup = () => {};
+    const created: Entry = { chart: inst, source: chart, gridKey: "", cleanup: () => {} };
     if (opts.autoResize !== false && typeof window !== "undefined") {
-      const onResize = () => inst.resize();
+      const onResize = () => {
+        inst.resize();
+        fitGrid(created);
+      };
       const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(onResize) : undefined;
       if (ro) ro.observe(element);
       else window.addEventListener("resize", onResize);
-      cleanup = () => {
+      created.cleanup = () => {
         ro?.disconnect();
         window.removeEventListener("resize", onResize);
       };
     }
-    entry = { chart: inst, cleanup };
+    entry = created;
     instances.set(element, entry);
   }
+  entry.source = chart;
   entry.chart.setOption(chart.option, { notMerge: true, ...(opts.setOption ?? {}) });
+  entry.gridKey = JSON.stringify(chart.option.grid);
+  fitGrid(entry);
   return entry.chart;
+}
+
+/** Recompute the grid for the measured height: default margins shrink on short charts. */
+function fitGrid(entry: Entry): void {
+  const height = entry.chart.getHeight();
+  if (!height) return;
+  const grid = entry.source.internals.gridFor(height);
+  const key = JSON.stringify(grid);
+  if (key === entry.gridKey) return;
+  entry.gridKey = key;
+  entry.chart.setOption({ grid });
 }
 
 /** Dispose the ECharts instance bound to `element` (if any). */

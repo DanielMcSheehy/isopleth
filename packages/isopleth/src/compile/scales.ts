@@ -1,7 +1,7 @@
 /** Scale inference: x, y, color and r from the resolved marks. */
 
 import type { ColorScaleOptions, PlotOptions, ScaleOptions, ScaleType, Value } from "../types.js";
-import { ascending, descending, inferType, isMissing, keyof, toNumber } from "../channel.js";
+import { ascending, descending, inferType, isColor, isMissing, keyof, toNumber } from "../channel.js";
 import { getBackend } from "../backend/index.js";
 import { scheme } from "./palette.js";
 import type { Theme } from "../theme.js";
@@ -27,6 +27,8 @@ export interface PositionScale {
 
 export interface ColorScale {
   kind: "categorical" | "continuous" | "none";
+  /** Channel values are literal CSS colours drawn as-is (Plot's identity scale); no legend. */
+  identity: boolean;
   domain: Value[];
   range: string[];
   colorOf: (v: Value) => string | undefined;
@@ -135,7 +137,10 @@ function positionScale(axis: "x" | "y", marks: ResolvedMark[], nFacets: number, 
       extent[1] = toNumber(options.domain[1] as Value);
     }
   }
-  const zero = options.zero ?? marks.some((m) => (axis === "y" ? ZERO_MARKS_Y : ZERO_MARKS_X).has(m.mark.type) && !m.mark.generated);
+  // Marks drawn from a baseline include zero; explicit intervals (x1 and x2 without stacking) and time axes do not.
+  const [c1, c2] = axis === "x" ? (["x1", "x2"] as const) : (["y1", "y2"] as const);
+  const anchored = (m: ResolvedMark) => (m.mark.options as Record<string, unknown>).__stacked !== undefined || !(m.channels[c1] && m.channels[c2]);
+  const zero = options.zero ?? (type !== "temporal" && marks.some((m) => (axis === "y" ? ZERO_MARKS_Y : ZERO_MARKS_X).has(m.mark.type) && !m.mark.generated && anchored(m)));
   return {
     type,
     domain,
@@ -219,7 +224,7 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}, them
     }
   }
   const index = new Map<string | number | boolean | null, number>();
-  const none: ColorScale = { kind: "none", domain: [], range: [], colorOf: () => undefined, extent: [0, 1], stops: [], legend: false, options, index };
+  const none: ColorScale = { kind: "none", identity: false, domain: [], range: [], colorOf: () => undefined, extent: [0, 1], stops: [], legend: false, options, index };
   if (chans.length === 0 && !options.domain) return none;
   const t = options.type === "categorical" || options.type === "ordinal" ? "ordinal" : options.type ? "quantitative" : typeOfChannels(chans);
   if (t === "ordinal" || t === undefined) {
@@ -234,6 +239,8 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}, them
     };
     if (options.domain) (options.domain as Value[]).forEach(push);
     else for (const c of chans) for (const v of c) push(v);
+    // Literal colours (`fill: "color"` holding "#e15759", or `fill: d => d.color`) bypass the palette.
+    const identity = !options.domain && !options.range && !options.scheme && !options.type && domain.length > 0 && domain.every((v) => isColor(v));
     let range = options.range ?? (options.scheme ? scheme(options.scheme, "observable10") : theme.categorical);
     if (options.reverse) range = range.slice().reverse();
     const overrides = new Map<string | number | boolean | null, string>();
@@ -242,12 +249,13 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}, them
       const k = keyof(v);
       const o = overrides.get(k) ?? overrides.get(String(k));
       if (o) return o;
+      if (identity && isColor(v)) return v;
       const i = index.get(k);
       if (i === undefined) return options.unknown ?? theme.textMuted;
       return range[i % range.length];
     };
     const effectiveRange = domain.map((v) => colorOf(v));
-    return { kind: "categorical", domain, range: effectiveRange.length ? effectiveRange : range, colorOf, extent: [0, 1], stops: [], label: options.label ?? label, legend: options.legend ?? domain.length > 1, options, index };
+    return { kind: "categorical", identity, domain, range: effectiveRange.length ? effectiveRange : range, colorOf, extent: [0, 1], stops: [], label: options.label ?? label, legend: options.legend ?? (!identity && domain.length > 1), options, index };
   }
   // Continuous.
   let lo = Infinity;
@@ -276,7 +284,7 @@ function colorScale(marks: ResolvedMark[], options: ColorScaleOptions = {}, them
     const t = hi === lo ? 0.5 : Math.min(1, Math.max(0, (x - lo) / (hi - lo)));
     return interpolateStops(stops, t);
   };
-  return { kind: "continuous", domain: [], range: stops, colorOf, extent: [lo, hi], stops, label: options.label ?? label, legend: options.legend ?? true, options, index };
+  return { kind: "continuous", identity: false, domain: [], range: stops, colorOf, extent: [lo, hi], stops, label: options.label ?? label, legend: options.legend ?? true, options, index };
 }
 
 function interpolateStops(stops: string[], t: number): string {

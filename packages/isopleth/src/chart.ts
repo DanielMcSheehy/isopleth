@@ -28,6 +28,7 @@ export interface ChartInstance {
   on(event: string, handler: (...args: unknown[]) => void): void;
   off(event: string, handler?: (...args: unknown[]) => void): void;
   getDom(): HTMLElement;
+  getHeight(): number;
   renderToSVGString?(opts?: unknown): string;
 }
 

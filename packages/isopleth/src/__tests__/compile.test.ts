@@ -112,10 +112,14 @@ describe("plot → option", () => {
     expect((chart.option.xAxis as any[])[0].data[0]).toBe("d");
   });
 
-  it("escape hatch merges extra ECharts options", () => {
-    const chart = ip.plot({ marks: [ip.lineY(ts, { x: "date", y: "value" })], echarts: { backgroundColor: "#123", xAxis: { name: "custom" } as any } });
+  it("escape hatch merges extra ECharts options into the generated axes", () => {
+    const chart = ip.plot({ marks: [ip.lineY(ts, { x: "date", y: "value" })], echarts: { backgroundColor: "#123", xAxis: { name: "custom" } as any, series: [{ type: "line", data: [] }] } });
     expect(chart.option.backgroundColor).toBe("#123");
-    expect((chart.option.xAxis as any).name).toBe("custom");
+    const xAxis = chart.option.xAxis as any[];
+    expect(xAxis[0].name).toBe("custom");
+    expect(xAxis[0].type).toBe("time");
+    expect(xAxis[0].axisLabel.fontSize).toBe(11);
+    expect((chart.option.series as any[]).length).toBe(2);
   });
 });
 
